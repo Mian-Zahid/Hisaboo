@@ -1,6 +1,6 @@
-package com.mianzahid.expenseentry
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
-@file:OptIn(ExperimentalFoundationApi::class)
+package com.mianzahid.expenseentry
 
 import android.app.Activity
 import android.content.Intent
