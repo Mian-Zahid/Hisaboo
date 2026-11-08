@@ -1,5 +1,7 @@
 package com.mianzahid.expenseentry
 
+@file:OptIn(ExperimentalFoundationApi::class)
+
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -21,6 +23,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
