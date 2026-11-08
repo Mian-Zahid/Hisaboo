@@ -154,7 +154,7 @@ fun CalculatorScreen(vm: AppViewModel) {
     Column(Modifier.fillMaxSize().background(Bg).padding(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(vm.t("calculator"), vm.t("currency"), "Units").forEachIndexed { i, label ->
-                Button(onClick = { tab = i }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (tab == i) Green else Color.LightGray, contentColor = if (tab == i) Color.White else Color.Black)) { Text(label, fontSize = 12.sp) }
+                Button(onClick = { tab = i }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = if (tab == i) Green else Color.LightGray, contentColor = if (tab == i) Color.White else Color.Black)) { Text(label, fontSize = 12.sp, maxLines = 1) }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -235,22 +235,20 @@ fun CurrencyCalc(vm: AppViewModel) {
     val result = if ((rates[to] ?: 1.0) == 0.0) 0.0 else pkr / (rates[to] ?: 1.0)
 
     LaunchedEffect(Unit) { vm.fetchRates() }
-    Column {
+    Column(Modifier.verticalScroll(rememberScrollState())) {
         Text(if (live) "● ${vm.t("liveRates")}" else "○ ${vm.t("offlineRates")}", color = if (live) Green else Color.Gray, fontSize = 12.sp)
         if (updated.isNotEmpty()) Text("${vm.t("lastUpdated")}: $updated", fontSize = 12.sp, color = Color.Gray)
         OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CurrencyDrop(currencies, from, { from = it }, Modifier.weight(1f))
-            Text("→", fontSize = 22.sp, modifier = Modifier.align(Alignment.CenterVertically))
+            IconButton(onClick = { val t = from; from = to; to = t }, modifier = Modifier.align(Alignment.CenterVertically)) { Icon(Icons.Filled.SwapHoriz, contentDescription = "Swap") }
             CurrencyDrop(currencies, to, { to = it }, Modifier.weight(1f))
         }
         Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
             Text("$amount $from = ${"%,.2f".format(result)} $to", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(14.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            Button(onClick = { vm.fetchRates() }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("updateRates")) }
-            OutlinedButton(onClick = { editMode = !editMode }) { Text(vm.t("editRates")) }
-        }
+        Button(onClick = { vm.fetchRates() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("updateRates"), fontWeight = FontWeight.Bold, maxLines = 1) }
+        OutlinedButton(onClick = { editMode = !editMode }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("editRates"), maxLines = 1) }
         if (editMode) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                 CurrencyDrop(currencies, editCur, { editCur = it }, Modifier.weight(1f))
@@ -291,7 +289,7 @@ fun UnitConverter(vm: AppViewModel) {
     var amount by remember { mutableStateOf("1") }
     var from by remember { mutableStateOf(groups["Length"]!![0].first) }
     var to by remember { mutableStateOf(groups["Length"]!![1].first) }
-    val units = groups[group]!!
+    val units = groups[group] ?: emptyList()
     val amt = amount.toDoubleOrNull() ?: 0.0
     val result = if (group == "Fuel") {
         if (from == "L/100km" && to == "km/L") 100.0 / amt else if (from == "km/L" && to == "L/100km") 100.0 / amt else amt
@@ -303,17 +301,14 @@ fun UnitConverter(vm: AppViewModel) {
     var tempTo by remember { mutableStateOf("F") }
 
     Column {
-        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            groups.keys.take(6).forEach { g ->
-                Button(onClick = { group = g; from = groups[g]!![0].first; to = groups[g]!![1].first }, colors = ButtonDefaults.buttonColors(containerColor = if (group == g) Green else Color.LightGray, contentColor = if (group == g) Color.White else Color.Black), modifier = Modifier.weight(1f)) { Text(g.take(4), fontSize = 10.sp) }
+        Text(group, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+        UnitDrop(groups.keys.toList() + "Temperature", group, { g ->
+            if (g == "Temperature") {
+                group = g
+            } else {
+                group = g; from = groups[g]!![0].first; to = groups[g]!![1].first
             }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            groups.keys.drop(6).forEach { g ->
-                Button(onClick = { group = g; from = groups[g]!![0].first; to = groups[g]!![1].first }, colors = ButtonDefaults.buttonColors(containerColor = if (group == g) Green else Color.LightGray, contentColor = if (group == g) Color.White else Color.Black), modifier = Modifier.weight(1f)) { Text(g.take(4), fontSize = 10.sp) }
-            }
-            Button(onClick = { group = "Temperature" }, colors = ButtonDefaults.buttonColors(containerColor = if (group == "Temperature") Green else Color.LightGray, contentColor = if (group == "Temperature") Color.White else Color.Black), modifier = Modifier.weight(1f)) { Text("Temp", fontSize = 10.sp) }
-        }
+        }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         if (group == "Temperature") {
             OutlinedTextField(value = tempC, onValueChange = { tempC = it }, label = { Text("°C") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())

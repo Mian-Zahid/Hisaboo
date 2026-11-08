@@ -112,8 +112,9 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
     fun clearToast() { _toast.value = "" }
 
     fun hasPin(): Boolean = prefs.contains("admin_pin_hash")
-    fun fingerprintEnabled(): Boolean = prefs.getBoolean("fingerprint", false)
-    fun setFingerprint(v: Boolean) { prefs.edit().putBoolean("fingerprint", v).apply() }
+    private val _fingerprintEnabled = MutableStateFlow(prefs.getBoolean("fingerprint", false))
+    val fingerprintEnabled: StateFlow<Boolean> = _fingerprintEnabled.asStateFlow()
+    fun setFingerprint(v: Boolean) { _fingerprintEnabled.value = v; prefs.edit().putBoolean("fingerprint", v).apply() }
 
     fun setLang(l: String) { _lang.value = l; prefs.edit().putString("lang", l).apply() }
     fun setTheme(th: String) { _theme.value = th; prefs.edit().putString("theme", th).apply() }
@@ -378,8 +379,10 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                 _ratesUpdated.value = stamp
                 prefs.edit().putString("rates_updated", stamp).apply()
                 dao.putSetting(Setting("rates", JSONObject(out as Map<*, *>).toString()))
+                showToast("Rates updated")
             } catch (e: Exception) {
                 _ratesLive.value = false
+                showToast("No internet — using offline rates")
             }
         }
     }

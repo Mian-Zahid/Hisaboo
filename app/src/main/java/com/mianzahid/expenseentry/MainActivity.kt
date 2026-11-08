@@ -13,6 +13,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -132,6 +134,7 @@ class MainActivity : FragmentActivity() {
             val unlocked by vm.unlocked.collectAsState()
             var screen by remember { mutableStateOf<Screen>(Screen.Home) }
             var backStack by remember { mutableStateOf<List<Screen>>(emptyList()) }
+            var showExitConfirm by remember { mutableStateOf(false) }
             fun go(s: Screen) { backStack = backStack + screen; screen = s }
             fun back() { if (backStack.isNotEmpty()) { screen = backStack.last(); backStack = backStack.dropLast(1) } else screen = Screen.Home }
 
@@ -154,6 +157,13 @@ class MainActivity : FragmentActivity() {
                         "dark" -> true
                         "light" -> false
                         else -> false
+                    }
+                    BackHandler {
+                        if (screen !is Screen.Home || backStack.isNotEmpty()) {
+                            back()
+                        } else {
+                            showExitConfirm = true
+                        }
                     }
                     Scaffold(
                         bottomBar = {
@@ -181,6 +191,15 @@ class MainActivity : FragmentActivity() {
                                 is Screen.ChangePin -> SubPage(vm, vm.t("changePin"), ::back) { ChangePinScreen(vm) }
                             }
                         }
+                    }
+                    if (showExitConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showExitConfirm = false },
+                            title = { Text("App band karni hai?") },
+                            text = { Text("Kya aap Hisaboo band karna chahte hain?") },
+                            confirmButton = { TextButton(onClick = { finish() }) { Text("Yes") } },
+                            dismissButton = { TextButton(onClick = { showExitConfirm = false }) { Text("No") } }
+                        )
                     }
                 }
             }
@@ -280,6 +299,7 @@ fun ThreeDotMenu(vm: AppViewModel) {
     var expanded by remember { mutableStateOf(false) }
     var showLang by remember { mutableStateOf(false) }
     var showTheme by remember { mutableStateOf(false) }
+    val fpEnabled by vm.fingerprintEnabled.collectAsState()
     val ctx = LocalContext.current
     val activity = ctx as? FragmentActivity
     Box {
@@ -308,13 +328,14 @@ fun ThreeDotMenu(vm: AppViewModel) {
             DropdownMenuItem(text = { Text(vm.t("changePin")) }, onClick = { expanded = false; NavBus.go(Screen.ChangePin) })
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("👆 ${vm.t("fingerprint")}", modifier = Modifier.weight(1f))
-                Switch(checked = vm.fingerprintEnabled(), onCheckedChange = { vm.setFingerprint(it) })
+                Switch(checked = fpEnabled, onCheckedChange = { vm.setFingerprint(it) })
             }
             DropdownMenuItem(text = { Text("${vm.t("theme")}: ${vm.theme.collectAsState().value}") }, onClick = {
                 val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
                 vm.setTheme(next)
             })
             DropdownMenuItem(text = { Text("${vm.t("language")}: ${vm.lang.collectAsState().value}") }, onClick = {
+                expanded = false
                 val next = when (vm.lang.value) { "en" -> "ur"; "ur" -> "roman"; else -> "en" }
                 vm.setLang(next)
             })
@@ -335,6 +356,7 @@ fun LockScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     val activity = ctx as? FragmentActivity
     val lang by vm.lang.collectAsState()
+    val fpEnabled by vm.fingerprintEnabled.collectAsState()
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var settingUp by remember { mutableStateOf(!vm.hasPin()) }
@@ -406,7 +428,7 @@ fun LockScreen(vm: AppViewModel) {
             if (error.isNotEmpty()) Text(error, color = Red)
             NumberPad(onDigit = { if (pin.length < 6) { pin += it; tryUnlock(pin) } }, onDelete = { pin = pin.dropLast(1); error = "" })
             Spacer(Modifier.height(12.dp))
-            if (vm.fingerprintEnabled()) {
+            if (fpEnabled) {
                 OutlinedButton(onClick = ::biometric, modifier = Modifier.fillMaxWidth()) { Text("👆 ${vm.t("useFingerprint")}") }
             }
             TextButton(onClick = { joinMode = true }) { Text(vm.t("joinWithCode")) }
@@ -533,9 +555,10 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                         val key = shortcuts.getOrNull(i) ?: ""
                         Box(
                             Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(12.dp))
-                                .background(Color.White).clickable {
-                                    if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key))
-                                },
+                                .background(Color.White).combinedClickable(
+                                    onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
+                                    onLongClick = { showShortcutPicker = i }
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (key.isBlank()) {
@@ -563,11 +586,16 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
 
     if (showShortcutPicker != null) {
         ShortcutPicker(vm, showShortcutPicker!!, onPick = { key ->
-            val list = shortcuts.toMutableList()
-            while (list.size < 6) list.add("")
-            list[showShortcutPicker!!] = key
-            vm.saveShortcuts(list)
-            showShortcutPicker = null
+            val slot = showShortcutPicker!!
+            if (shortcuts.indexOf(key) >= 0 && shortcuts.indexOf(key) != slot) {
+                vm.showToast("Already added")
+            } else {
+                val list = shortcuts.toMutableList()
+                while (list.size < 6) list.add("")
+                list[slot] = key
+                vm.saveShortcuts(list)
+                showShortcutPicker = null
+            }
         }, onRemove = {
             val list = shortcuts.toMutableList()
             while (list.size < 6) list.add("")
@@ -630,7 +658,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
             val spoken = res.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: ""
             val num = Regex("\\d+").find(spoken)?.value
             if (num != null) amount = num
-            if (note.isBlank()) note = spoken
+            if (note.isBlank()) note = spoken.filterNot { it == '₹' || it == '$' || it == '€' || it == '£' || it == '¥' }.trim()
         }
     }
     AlertDialog(
@@ -639,6 +667,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, modifier = Modifier.fillMaxWidth())
                 if (categoryId == null) {
                     Text(vm.t("category"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
@@ -661,13 +690,14 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                    OutlinedButton(onClick = { pickImage.launch("image/*") }) { Text("📷 ${vm.t("receiptPhoto")}") }
+                    OutlinedButton(onClick = { pickImage.launch("image/*") }, modifier = Modifier.weight(1f)) { Text("📷 ${vm.t("receiptPhoto")}", maxLines = 1) }
                     OutlinedButton(onClick = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ur-PK")
                         }
                         try { speech.launch(intent) } catch (e: Exception) { vm.showToast(vm.t("voiceNotSupported")) }
-                    }) { Text("🎤 ${vm.t("voiceEntry")}") }
+                    }, modifier = Modifier.weight(1f)) { Text("🎤 ${vm.t("voiceEntry")}", maxLines = 1) }
                 }
                 if (receiptUri.isNotEmpty()) Text("✓ ${vm.t("receiptPhoto")}", color = Green, fontSize = 12.sp)
             }
