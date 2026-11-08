@@ -19,6 +19,8 @@ jobs:
           echo "Source dir: $SRC"
           rsync -a "$SRC"/ ./
           rm -rf extracted
+          rm -f .github/workflows/android.yml
+          
           rm -f hisaboo-github-ready-v1.2.zip
           rm -f .github/workflows/extract.yml
           echo "--- files ---"
