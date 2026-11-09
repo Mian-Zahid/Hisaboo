@@ -358,91 +358,96 @@ fun ThreeDotMenu(vm: AppViewModel) {
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxHeight(0.85f),
-            shape = RoundedCornerShape(20.dp),
-            containerColor = Color(0xFFFAF8F2),
-            shadowElevation = 8.dp
+            modifier = Modifier.fillMaxHeight(0.85f)
         ) {
-            val items = listOf(
-                "report" to vm.t("monthlyReport"), "search" to vm.t("search"),
-                "planned" to vm.t("planned"), "reminders" to vm.t("reminders"),
-                "budgets" to vm.t("budget"), "loan" to vm.t("loan"),
-                "bills" to vm.t("bills"),
-                "family" to vm.t("family"), "backup" to vm.t("backup"),
-                "calculator" to vm.t("calculator")
-            )
-            // Navigation items need a callback; handled by parent via a shared nav holder
-            items.forEach { (key, label) ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(shortcutIcon(key), fontSize = 18.sp)
-                            Spacer(Modifier.width(10.dp))
-                            Text(label, fontSize = 15.sp)
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFFFAF8F2),
+                shadowElevation = 8.dp
+            ) {
+                Column {
+                    val items = listOf(
+                        "report" to vm.t("monthlyReport"), "search" to vm.t("search"),
+                        "planned" to vm.t("planned"), "reminders" to vm.t("reminders"),
+                        "budgets" to vm.t("budget"), "loan" to vm.t("loan"),
+                        "bills" to vm.t("bills"),
+                        "family" to vm.t("family"), "backup" to vm.t("backup"),
+                        "calculator" to vm.t("calculator")
+                    )
+                    // Navigation items need a callback; handled by parent via a shared nav holder
+                    for ((key, label) in items) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(shortcutIcon(key), fontSize = 18.sp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(label, fontSize = 15.sp)
+                                }
+                            },
+                            onClick = {
+                                expanded = false
+                                NavBus.go(shortcutToScreen(key))
+                            }
+                        )
+                    }
+                    Divider(color = Green.copy(alpha = 0.15f))
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("\uD83D\uDD10", fontSize = 18.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text(vm.t("changePin"), fontSize = 15.sp)
+                            }
+                        },
+                        onClick = { expanded = false; NavBus.go(Screen.ChangePin) }
+                    )
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("\uD83D\uDC46", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(vm.t("fingerprint"), modifier = Modifier.weight(1f), fontSize = 15.sp)
+                        Switch(checked = fpEnabled, onCheckedChange = { vm.setFingerprint(it) })
+                    }
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("\uD83C\uDFA8", fontSize = 18.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text("${vm.t("theme")}: ${themeName(theme, vm)}", fontSize = 15.sp)
+                            }
+                        },
+                        onClick = {
+                            val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
+                            vm.setTheme(next)
                         }
-                    },
-                    onClick = {
-                        expanded = false
-                        NavBus.go(shortcutToScreen(key))
-                    }
-                )
-            }
-            Divider(color = Green.copy(alpha = 0.15f))
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("\uD83D\uDD10", fontSize = 18.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(vm.t("changePin"), fontSize = 15.sp)
-                    }
-                },
-                onClick = { expanded = false; NavBus.go(Screen.ChangePin) }
-            )
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("\uD83D\uDC46", fontSize = 18.sp)
-                Spacer(Modifier.width(10.dp))
-                Text(vm.t("fingerprint"), modifier = Modifier.weight(1f), fontSize = 15.sp)
-                Switch(checked = fpEnabled, onCheckedChange = { vm.setFingerprint(it) })
-            }
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("\uD83C\uDFA8", fontSize = 18.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text("${vm.t("theme")}: ${themeName(theme, vm)}", fontSize = 15.sp)
-                    }
-                },
-                onClick = {
-                    val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
-                    vm.setTheme(next)
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("\uD83C\uDF10", fontSize = 18.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text("${vm.t("language")}: ${langName(langVal, vm)}", fontSize = 15.sp)
+                            }
+                        },
+                        onClick = {
+                            expanded = false
+                            val next = when (vm.lang.value) { "en" -> "ur"; "ur" -> "roman"; else -> "en" }
+                            vm.setLang(next)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("\uD83D\uDD12", fontSize = 18.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text(vm.t("lock"), fontSize = 15.sp)
+                            }
+                        },
+                        onClick = { expanded = false; vm.lock() }
+                    )
+                    Divider(color = Green.copy(alpha = 0.15f))
+                    DropdownMenuItem(text = { Text(vm.t("madeBy"), fontSize = 12.sp, color = Color.Gray) }, onClick = {})
                 }
-            )
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("\uD83C\uDF10", fontSize = 18.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text("${vm.t("language")}: ${langName(langVal, vm)}", fontSize = 15.sp)
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    val next = when (vm.lang.value) { "en" -> "ur"; "ur" -> "roman"; else -> "en" }
-                    vm.setLang(next)
-                }
-            )
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("\uD83D\uDD12", fontSize = 18.sp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(vm.t("lock"), fontSize = 15.sp)
-                    }
-                },
-                onClick = { expanded = false; vm.lock() }
-            )
-            Divider(color = Green.copy(alpha = 0.15f))
-            DropdownMenuItem(text = { Text(vm.t("madeBy"), fontSize = 12.sp, color = Color.Gray) }, onClick = {})
+            }
         }
     }
 }

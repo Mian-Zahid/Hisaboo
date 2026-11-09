@@ -338,7 +338,6 @@ fun UnitConverter(vm: AppViewModel) {
     }
 }
 
-@Composable
 // Translated display name for a unit-converter group key (stored key stays English).
 fun unitGroupLabel(vm: AppViewModel, key: String): String = when (key) {
     "Length" -> vm.t("unitLength")
