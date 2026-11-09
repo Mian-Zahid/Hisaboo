@@ -211,11 +211,6 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                     Category(name = "Other Expense", type = "OUT", isDefault = true)
                 )
                 defaults.forEach { dao.insertCategory(it) }
-                // Seed data the user already had in the web app
-                val sal = dao.allCategories().firstOrNull { it.name == "Salary" }
-                val food = dao.allCategories().firstOrNull { it.name == "Food" }
-                if (sal != null) dao.insertEntry(Entry(categoryId = sal.id, amount = 65000, type = "IN", note = "Salary", dateMillis = 1762300800000L, memberId = 0, memberName = "Admin"))
-                if (food != null) dao.insertEntry(Entry(categoryId = food.id, amount = 500, type = "OUT", note = "Food", dateMillis = 1762387200000L, memberId = 0, memberName = "Admin"))
             }
             } catch (e: Exception) {
                 // Seeding must never crash first launch: an empty DB is a safe fallback.
