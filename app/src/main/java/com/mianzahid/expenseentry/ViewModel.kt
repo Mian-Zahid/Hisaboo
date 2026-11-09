@@ -27,22 +27,38 @@ fun sha256(s: String): String =
 
 fun fmtRs(v: Long): String = "Rs " + "%,d".format(v)
 
-// One Quranic verse for the Home screen: Arabic + Urdu translation + reference.
-data class DailyAyat(
-    val arabic: String,
-    val urdu: String,
-    val surahName: String,
-    val ref: String // e.g. "Surah Hud — 11:6"
+// One hadith for the Home screen: Urdu text + English text + book + number.
+// The reference is always book + hadith number — never shown without it.
+data class DailyHadith(
+    val textUrdu: String,
+    val textEn: String,
+    val book: String, // e.g. "Sahih al-Bukhari"
+    val number: Int, // hadith number within the book
+    val section: String // e.g. "Revelation"
 )
 
 fun fullDate(millis: Long, lang: String): String {
     val cal = Calendar.getInstance().apply { timeInMillis = millis }
-    val dow = SimpleDateFormat("EEEE", Locale.ENGLISH).format(Date(millis))
+    val days = listOf("sun","mon","tue","wed","thu","fri","sat")
+    val dow = Strings.get(lang, days[cal.get(Calendar.DAY_OF_WEEK) - 1])
     val day = cal.get(Calendar.DAY_OF_MONTH)
     val months = listOf("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec")
     val mon = Strings.get(lang, months[cal.get(Calendar.MONTH)])
     val year = cal.get(Calendar.YEAR)
     return if (lang == "ur") "$dow، $day $mon $year" else "$dow, $day $mon $year"
+}
+
+// Localized timestamp for "last updated / last backup" lines: day + translated
+// month + year + time (never English month names).
+fun localizedStamp(millis: Long, lang: String): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = millis }
+    val day = cal.get(Calendar.DAY_OF_MONTH)
+    val months = listOf("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec")
+    val mon = Strings.get(lang, months[cal.get(Calendar.MONTH)])
+    val year = cal.get(Calendar.YEAR)
+    val hh = "%02d".format(cal.get(Calendar.HOUR_OF_DAY))
+    val mm = "%02d".format(cal.get(Calendar.MINUTE))
+    return "$day $mon $year $hh:$mm"
 }
 
 fun shortDate(millis: Long, lang: String): String {
@@ -115,18 +131,43 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
     val lastBackup: StateFlow<String> = _lastBackup.asStateFlow()
     private val _toast = MutableStateFlow("")
     val toast: StateFlow<String> = _toast.asStateFlow()
-    // Default verse (Surah Hud 11:6 — about rizq) shown only if no verse was
-    // ever fetched and cached (e.g. first launch with no internet).
-    private val defaultAyat = DailyAyat(
-        arabic = "وَمَا مِن دَابَّةٍ فِي الْأَرْضِ إِلَّا عَلَى اللَّهِ رِزْقُهَا وَيَعْلَمُ مُسْتَقَرَّهَا وَمُسْتَوْدَعَهَا ۚ كُلٌّ فِي كِتَابٍ مُّبِينٍ",
-        urdu = "اور زمین پر چلنے والا کوئی جاندار ایسا نہیں جس کا رزق اللہ کے ذمے نہ ہو، اور وہ اس کے ٹھہرنے کی جگہ اور سونپے جانے کی جگہ کو جانتا ہے۔ سب کچھ ایک واضح کتاب میں ہے۔",
-        surahName = "Hud",
-        ref = "Surah Hud — 11:6"
+    // Default hadith (Sahih al-Bukhari #1 — actions are but by intentions) shown
+    // only if no hadith was ever fetched and cached (e.g. first launch offline).
+    private val defaultHadith = DailyHadith(
+        textUrdu = "کو حمیدی نے یہ حدیث بیان کی، انہوں نے کہا کہ ہم کو سفیان نے یہ حدیث بیان کی، وہ کہتے ہیں ہم کو یحییٰ بن سعید انصاری نے یہ حدیث بیان کی، انہوں نے کہا کہ مجھے یہ حدیث محمد بن ابراہیم تیمی سے حاصل ہوئی۔ انہوں نے اس حدیث کو علقمہ بن وقاص لیثی سے سنا، ان کا بیان ہے کہ میں نے مسجد نبوی میں منبر رسول صلی اللہ علیہ وسلم پر عمر بن خطاب رضی اللہ عنہ کی زبان سے سنا، وہ فرما رہے تھے کہ میں نے جناب رسول اللہ صلی اللہ علیہ وسلم سے سنا آپ صلی اللہ علیہ وسلم فرما رہے تھے کہ تمام اعمال کا دارومدار نیت پر ہے اور ہر عمل کا نتیجہ ہر انسان کو اس کی نیت کے مطابق ہی ملے گا۔ پس جس کی ہجرت ( ترک وطن ) دولت دنیا حاصل کرنے کے لیے ہو یا کسی عورت سے شادی کی غرض ہو۔ پس اس کی ہجرت ان ہی چیزوں کے لیے ہو گی جن کے حاصل کرنے کی نیت سے اس نے ہجرت کی ہے۔",
+        textEn = "Narrated 'Umar bin Al-Khattab: I heard Allah's Messenger (ﷺ) saying, \"The reward of deeds depends upon the intentions and every person will get the reward according to what he has intended. So whoever emigrated for worldly benefits or for a woman to marry, his emigration was for what he emigrated for\"",
+        book = "Sahih al-Bukhari",
+        number = 1,
+        section = "Revelation"
     )
-    private val _dailyAyat = MutableStateFlow(defaultAyat)
-    val dailyAyat: StateFlow<DailyAyat> = _dailyAyat.asStateFlow()
+    private val _dailyHadith = MutableStateFlow(defaultHadith)
+    val dailyHadith: StateFlow<DailyHadith> = _dailyHadith.asStateFlow()
 
     fun t(key: String): String = Strings.get(_lang.value, key)
+
+    // Display name for a category: default categories are translated (their stored
+    // names are English); user-created categories show the name the user typed.
+    fun catName(cat: Category): String {
+        if (!cat.isDefault) return cat.name
+        return when (cat.name.trim().lowercase()) {
+            "salary" -> t("catSalary")
+            "business" -> t("catBusiness")
+            "other income" -> t("catOtherIncome")
+            "food" -> t("catFood")
+            "transport" -> t("catTransport")
+            "shopping" -> t("catShopping")
+            "bills" -> t("catBills")
+            "rent" -> t("catRent")
+            "other expense" -> t("catOtherExpense")
+            else -> cat.name
+        }
+    }
+
+    // Stored system words are English ("Admin", "Recurring") — translate at display.
+    fun memberDisplayName(name: String): String =
+        if (name.trim().equals("Admin", ignoreCase = true)) t("admin") else name
+    fun noteDisplay(note: String): String =
+        if (note.trim().equals("Recurring", ignoreCase = true)) t("recurring") else note
     fun showToast(s: String) { _toast.value = s }
     fun clearToast() { _toast.value = "" }
 
@@ -255,7 +296,7 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
             val e = dao.allEntries().firstOrNull { it.id == id } ?: return@launch
             if (!_isAdmin.value) {
                 val v = _viewer.value ?: return@launch
-                if (e.memberId != v.id) { showToast("Not allowed"); return@launch }
+                if (e.memberId != v.id) { showToast(t("notAllowed")); return@launch }
             }
             dao.deleteEntry(id); refresh()
         }
@@ -399,11 +440,11 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                     map.forEach { (k, v) -> if (k != "PKR" && k != "USD") out[k] = pkrPerUsd / v }
                     _rates.value = out
                     _ratesLive.value = true
-                    val stamp = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.ENGLISH).format(Date())
+                    val stamp = localizedStamp(System.currentTimeMillis(), _lang.value)
                     _ratesUpdated.value = stamp
                     prefs.edit().putString("rates_updated", stamp).apply()
                     dao.putSetting(Setting("rates", JSONObject(out as Map<*, *>).toString()))
-                    showToast("Rates updated")
+                    showToast(t("ratesUpdated"))
                     return@launch
                 } catch (e: Exception) {
                     lastError = e
@@ -412,73 +453,68 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
             }
             _ratesLive.value = false
             val reason = lastError?.javaClass?.simpleName ?: "Unknown"
-            showToast("Rates update failed: $reason — using offline rates")
+            showToast("${t("ratesFailed")}: $reason ${t("usingOffline")}")
         }
     }
 
     // Daily Quranic verse for the Home screen (AlQuran Cloud API, free, no key).
-    // Verse number is derived from the date: stable within a day, new every day.
+    // One hadith a day from Sahih al-Bukhari (fawazahmed0/hadith-api via jsDelivr).
+    // Hadith number is derived from the date: stable within a day, new every day.
     // Runs on Dispatchers.IO (network must never run on the main thread).
-    // Offline: shows the cached verse; if never cached, the default (Hud 11:6).
-    fun fetchDailyAyat() {
+    // Offline: shows the cached hadith; if never cached, the default (Bukhari #1).
+    // The reference is always book + hadith number — a hadith is never shown
+    // without it.
+    fun fetchDailyHadith() {
         viewModelScope.launch(Dispatchers.IO) {
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
-            // Step 1: Use today's cached verse if we already fetched it.
+            // Step 1: Use today's cached hadith if we already fetched it.
             try {
-                val cached = dao.setting("daily_ayat")?.value
+                val cached = dao.setting("daily_hadith")?.value
                 if (cached != null) {
                     val cj = JSONObject(cached)
-                    if (cj.optString("date") == today && cj.optString("arabic").isNotBlank()) {
-                        _dailyAyat.value = DailyAyat(
-                            cj.optString("arabic"), cj.optString("urdu"),
-                            cj.optString("surah"), cj.optString("ref")
+                    if (cj.optString("date") == today && (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank())) {
+                        _dailyHadith.value = DailyHadith(
+                            cj.optString("textUrdu"), cj.optString("textEn"),
+                            cj.optString("book"), cj.optInt("number"),
+                            cj.optString("section")
                         )
                         return@launch
                     }
                 }
             } catch (_: Exception) { /* fall through to network */ }
-            // Step 2: Fetch today's verse.
+            // Step 2: Fetch today's hadith (Urdu + English editions).
             val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-            val number = (dayOfYear * 17 % 6236) + 1
+            val number = (dayOfYear * 17 % 7563) + 1 // Sahih al-Bukhari has 7563 hadiths
             try {
-                val url = URL("https://api.alquran.cloud/v1/ayah/$number/editions/quran-uthmani,ur.jalandhry")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 20000; conn.readTimeout = 30000
-                val text = conn.inputStream.bufferedReader().readText()
-                val data = JSONObject(text).getJSONArray("data")
-                var arabic = ""; var urdu = ""
-                var surahName = ""; var surahNo = 0; var ayahInSurah = 0
-                for (i in 0 until data.length()) {
-                    val ed = data.getJSONObject(i)
-                    val id = ed.optJSONObject("edition")?.optString("identifier") ?: ""
-                    val surah = ed.optJSONObject("surah")
-                    if (surah != null) {
-                        surahName = surah.optString("englishName")
-                        surahNo = surah.optInt("number")
-                    }
-                    ayahInSurah = ed.optInt("numberInSurah")
-                    if (id == "quran-uthmani") arabic = ed.optString("text")
-                    if (id == "ur.jalandhry") urdu = ed.optString("text")
-                }
-                if (arabic.isBlank()) return@launch // keep current (cached/default)
-                val ayat = DailyAyat(arabic, urdu, surahName, "Surah $surahName — $surahNo:$ayahInSurah")
-                _dailyAyat.value = ayat
+                val urduJson = fetchUrl("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/urd-bukhari/$number.json")
+                val enJson = fetchUrl("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari/$number.json")
+                val urduObj = JSONObject(urduJson)
+                val enObj = JSONObject(enJson)
+                val urduHadith = urduObj.optJSONArray("hadiths")?.optJSONObject(0)
+                val enHadith = enObj.optJSONArray("hadiths")?.optJSONObject(0)
+                val textUrdu = urduHadith?.optString("text") ?: ""
+                val textEn = enHadith?.optString("text") ?: ""
+                if (textUrdu.isBlank() && textEn.isBlank()) return@launch // keep current
+                val section = urduObj.optJSONObject("metadata")?.optJSONObject("section")?.optString("1") ?: ""
+                val hadith = DailyHadith(textUrdu, textEn, "Sahih al-Bukhari", number, section)
+                _dailyHadith.value = hadith
                 val cj = JSONObject().apply {
                     put("date", today); put("number", number)
-                    put("arabic", arabic); put("urdu", urdu)
-                    put("surah", surahName); put("ref", ayat.ref)
+                    put("textUrdu", textUrdu); put("textEn", textEn)
+                    put("book", hadith.book); put("section", section)
                 }
-                dao.putSetting(Setting("daily_ayat", cj.toString()))
+                dao.putSetting(Setting("daily_hadith", cj.toString()))
             } catch (_: Exception) {
-                // Offline: fall back to the last cached verse (any day), else default.
+                // Offline: fall back to the last cached hadith (any day), else default.
                 try {
-                    val cached = dao.setting("daily_ayat")?.value
+                    val cached = dao.setting("daily_hadith")?.value
                     if (cached != null) {
                         val cj = JSONObject(cached)
-                        if (cj.optString("arabic").isNotBlank()) {
-                            _dailyAyat.value = DailyAyat(
-                                cj.optString("arabic"), cj.optString("urdu"),
-                                cj.optString("surah"), cj.optString("ref")
+                        if (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank()) {
+                            _dailyHadith.value = DailyHadith(
+                                cj.optString("textUrdu"), cj.optString("textEn"),
+                                cj.optString("book"), cj.optInt("number"),
+                                cj.optString("section")
                             )
                         }
                     }
@@ -487,11 +523,18 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
         }
     }
 
+    private fun fetchUrl(urlStr: String): String {
+        val url = URL(urlStr)
+        val conn = url.openConnection() as HttpURLConnection
+        conn.connectTimeout = 20000; conn.readTimeout = 30000
+        return conn.inputStream.bufferedReader().readText()
+    }
+
     fun setRate(currency: String, pkrPerUnit: Double) {
         val m = _rates.value.toMutableMap(); m[currency] = pkrPerUnit
         _rates.value = m; _ratesLive.value = false
         viewModelScope.launch { dao.putSetting(Setting("rates", JSONObject(m as Map<*, *>).toString())) }
-        showToast("Rate saved")
+        showToast(t("rateSaved"))
     }
 
     // ---------- Backup / Restore ----------
@@ -521,7 +564,7 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
             val json = buildBackupJson()
             val f = File(ctx.filesDir, "backup.json")
             f.writeText(json)
-            val stamp = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.ENGLISH).format(Date())
+            val stamp = localizedStamp(System.currentTimeMillis(), _lang.value)
             _lastBackup.value = stamp
             prefs.edit().putString("last_backup", stamp).apply()
             true

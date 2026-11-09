@@ -21,6 +21,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -41,6 +49,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +68,28 @@ val GreenLight = Color(0xFF147A55)
 val Red = Color(0xFFC81E3A)
 val Bg = Color(0xFFF2F2F0)
 val CardWhite = Color.White
+
+// Jameel Noori Nastaliq for Urdu text (bundled in res/font).
+val UrduFontFamily = FontFamily(Font(R.font.jameel_noori_nastaleeq))
+
+// Nastaliq is tall — Urdu typography uses generous line heights so text never clips.
+fun urduTypography(): Typography = Typography(
+    displayLarge = TextStyle(fontFamily = UrduFontFamily, lineHeight = 56.sp),
+    displayMedium = TextStyle(fontFamily = UrduFontFamily, lineHeight = 48.sp),
+    displaySmall = TextStyle(fontFamily = UrduFontFamily, lineHeight = 44.sp),
+    headlineLarge = TextStyle(fontFamily = UrduFontFamily, lineHeight = 44.sp),
+    headlineMedium = TextStyle(fontFamily = UrduFontFamily, lineHeight = 40.sp),
+    headlineSmall = TextStyle(fontFamily = UrduFontFamily, lineHeight = 36.sp),
+    titleLarge = TextStyle(fontFamily = UrduFontFamily, lineHeight = 36.sp),
+    titleMedium = TextStyle(fontFamily = UrduFontFamily, lineHeight = 32.sp),
+    titleSmall = TextStyle(fontFamily = UrduFontFamily, lineHeight = 30.sp),
+    bodyLarge = TextStyle(fontFamily = UrduFontFamily, lineHeight = 30.sp),
+    bodyMedium = TextStyle(fontFamily = UrduFontFamily, lineHeight = 28.sp),
+    bodySmall = TextStyle(fontFamily = UrduFontFamily, lineHeight = 26.sp),
+    labelLarge = TextStyle(fontFamily = UrduFontFamily, lineHeight = 28.sp),
+    labelMedium = TextStyle(fontFamily = UrduFontFamily, lineHeight = 26.sp),
+    labelSmall = TextStyle(fontFamily = UrduFontFamily, lineHeight = 24.sp)
+)
 
 sealed class Screen {
     object Home : Screen()
@@ -152,7 +185,10 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            MaterialTheme(colorScheme = lightColorScheme(primary = Green, secondary = GreenLight)) {
+            MaterialTheme(
+                colorScheme = lightColorScheme(primary = Green, secondary = GreenLight),
+                typography = if (lang == "ur") urduTypography() else Typography()
+            ) {
                 if (!unlocked) {
                     LockScreen(vm = vm)
                 } else {
@@ -176,7 +212,15 @@ class MainActivity : FragmentActivity() {
                         }
                     ) { pad ->
                         Box(Modifier.padding(pad)) {
-                            when (val s = screen) {
+                            AnimatedContent(
+                                targetState = screen,
+                                transitionSpec = {
+                                    (fadeIn(animationSpec = tween(250)) + slideInHorizontally(animationSpec = tween(250, easing = FastOutSlowInEasing)) { it / 4 }) togetherWith
+                                        (fadeOut(animationSpec = tween(200)) + slideOutHorizontally(animationSpec = tween(200, easing = FastOutSlowInEasing)) { -it / 4 })
+                                },
+                                label = "screen"
+                            ) { s ->
+                            when (s) {
                                 is Screen.Home -> HomeScreen(vm, onGo = ::go)
                                 is Screen.Categories -> CategoriesScreen(vm, onOpen = { go(Screen.CategoryDetail(it)) })
                                 is Screen.Calculator -> CalculatorScreen(vm)
@@ -192,15 +236,16 @@ class MainActivity : FragmentActivity() {
                                 is Screen.Backup -> SubPage(vm, vm.t("backup"), ::back) { BackupScreen(vm) }
                                 is Screen.ChangePin -> SubPage(vm, vm.t("changePin"), ::back) { ChangePinScreen(vm) }
                             }
+                            }
                         }
                     }
                     if (showExitConfirm) {
                         AlertDialog(
                             onDismissRequest = { showExitConfirm = false },
-                            title = { Text("App band karni hai?") },
-                            text = { Text("Kya aap Hisaboo band karna chahte hain?") },
-                            confirmButton = { TextButton(onClick = { finish() }) { Text("Yes") } },
-                            dismissButton = { TextButton(onClick = { showExitConfirm = false }) { Text("No") } }
+                            title = { Text(vm.t("exitTitle")) },
+                            text = { Text(vm.t("exitText")) },
+                            confirmButton = { TextButton(onClick = { finish() }) { Text(vm.t("yes")) } },
+                            dismissButton = { TextButton(onClick = { showExitConfirm = false }) { Text(vm.t("no")) } }
                         )
                     }
                 }
@@ -299,17 +344,23 @@ fun SubPage(vm: AppViewModel, title: String, onBack: () -> Unit, content: @Compo
 @Composable
 fun ThreeDotMenu(vm: AppViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    var showLang by remember { mutableStateOf(false) }
-    var showTheme by remember { mutableStateOf(false) }
     val fpEnabled by vm.fingerprintEnabled.collectAsState()
+    val theme by vm.theme.collectAsState()
+    val langVal by vm.lang.collectAsState()
     val ctx = LocalContext.current
     val activity = ctx as? FragmentActivity
     Box {
-        IconButton(onClick = { expanded = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu") }
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.clip(CircleShape).background(Green.copy(alpha = 0.12f))
+        ) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = Green) }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxHeight(0.85f)
+            modifier = Modifier.fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color(0xFFFAF8F2),
+            shadowElevation = 8.dp
         ) {
             val items = listOf(
                 "report" to vm.t("monthlyReport"), "search" to vm.t("search"),
@@ -321,31 +372,90 @@ fun ThreeDotMenu(vm: AppViewModel) {
             )
             // Navigation items need a callback; handled by parent via a shared nav holder
             items.forEach { (key, label) ->
-                DropdownMenuItem(text = { Text(label) }, onClick = {
-                    expanded = false
-                    NavBus.go(shortcutToScreen(key))
-                })
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(shortcutIcon(key), fontSize = 18.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(label, fontSize = 15.sp)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        NavBus.go(shortcutToScreen(key))
+                    }
+                )
             }
-            Divider()
-            DropdownMenuItem(text = { Text(vm.t("changePin")) }, onClick = { expanded = false; NavBus.go(Screen.ChangePin) })
+            Divider(color = Green.copy(alpha = 0.15f))
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("\uD83D\uDD10", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(vm.t("changePin"), fontSize = 15.sp)
+                    }
+                },
+                onClick = { expanded = false; NavBus.go(Screen.ChangePin) }
+            )
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("👆 ${vm.t("fingerprint")}", modifier = Modifier.weight(1f))
+                Text("\uD83D\uDC46", fontSize = 18.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(vm.t("fingerprint"), modifier = Modifier.weight(1f), fontSize = 15.sp)
                 Switch(checked = fpEnabled, onCheckedChange = { vm.setFingerprint(it) })
             }
-            DropdownMenuItem(text = { Text("${vm.t("theme")}: ${vm.theme.collectAsState().value}") }, onClick = {
-                val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
-                vm.setTheme(next)
-            })
-            DropdownMenuItem(text = { Text("${vm.t("language")}: ${vm.lang.collectAsState().value}") }, onClick = {
-                expanded = false
-                val next = when (vm.lang.value) { "en" -> "ur"; "ur" -> "roman"; else -> "en" }
-                vm.setLang(next)
-            })
-            DropdownMenuItem(text = { Text(vm.t("lock")) }, onClick = { expanded = false; vm.lock() })
-            Divider()
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("\uD83C\uDFA8", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("${vm.t("theme")}: ${themeName(theme, vm)}", fontSize = 15.sp)
+                    }
+                },
+                onClick = {
+                    val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
+                    vm.setTheme(next)
+                }
+            )
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("\uD83C\uDF10", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("${vm.t("language")}: ${langName(langVal, vm)}", fontSize = 15.sp)
+                    }
+                },
+                onClick = {
+                    expanded = false
+                    val next = when (vm.lang.value) { "en" -> "ur"; "ur" -> "roman"; else -> "en" }
+                    vm.setLang(next)
+                }
+            )
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("\uD83D\uDD12", fontSize = 18.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(vm.t("lock"), fontSize = 15.sp)
+                    }
+                },
+                onClick = { expanded = false; vm.lock() }
+            )
+            Divider(color = Green.copy(alpha = 0.15f))
             DropdownMenuItem(text = { Text(vm.t("madeBy"), fontSize = 12.sp, color = Color.Gray) }, onClick = {})
         }
     }
+}
+
+fun themeName(theme: String, vm: AppViewModel): String = when (theme) {
+    "light" -> vm.t("light")
+    "dark" -> vm.t("dark")
+    else -> vm.t("auto")
+}
+
+fun langName(lang: String, vm: AppViewModel): String = when (lang) {
+    "ur" -> vm.t("urdu")
+    "roman" -> vm.t("romanUrdu")
+    else -> vm.t("english")
 }
 
 // Simple navigation bus so the 3-dot menu (used in many places) can navigate
@@ -484,8 +594,8 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     val shortcuts by vm.shortcuts.collectAsState()
     val isAdmin by vm.isAdmin.collectAsState()
     val viewer by vm.viewer.collectAsState()
-    val ayat by vm.dailyAyat.collectAsState()
-    LaunchedEffect(Unit) { vm.fetchDailyAyat() }
+    val hadith by vm.dailyHadith.collectAsState()
+    LaunchedEffect(Unit) { vm.fetchDailyHadith() }
     var showEntry by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
     var showShortcutPicker by remember { mutableStateOf<Int?>(null) }
 
@@ -505,7 +615,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
         }
         // Balance card
         Card(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Green)
         ) {
@@ -540,7 +650,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
                         Text(vm.t("topExpense"), fontSize = 11.sp, color = Color.Gray, maxLines = 1)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(topCat.first.name, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            Text(vm.catName(topCat.first), fontSize = 17.sp, fontWeight = FontWeight.Bold)
                             Text("  •  ${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
@@ -581,7 +691,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        DailyAyatCard(ayat)
+        DailyHadithCard(vm, hadith)
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { showEntry = "IN" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text(vm.t("moneyIn"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
@@ -593,7 +703,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
         ShortcutPicker(vm, showShortcutPicker!!, onPick = { key ->
             val slot = showShortcutPicker!!
             if (shortcuts.indexOf(key) >= 0 && shortcuts.indexOf(key) != slot) {
-                vm.showToast("Already added")
+                vm.showToast(vm.t("alreadyAdded"))
             } else {
                 val list = shortcuts.toMutableList()
                 while (list.size < 6) list.add("")
@@ -614,30 +724,49 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     }
 }
 
-// Daily Quranic verse card (Home screen, below the shortcut tiles).
-// Green theme, modest height; Arabic RTL in large font, Urdu below, reference last.
+// Daily hadith card (Home screen, below the shortcut tiles).
+// Green theme; Urdu text in Jameel Noori Nastaliq (RTL, tall lines),
+// English text otherwise; reference (book + hadith number) always shown.
 @Composable
-fun DailyAyatCard(ayat: DailyAyat) {
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2EA))
+fun DailyHadithCard(vm: AppViewModel, hadith: DailyHadith) {
+    val lang by vm.lang.collectAsState()
+    val isUrdu = lang == "ur"
+    val text = if (isUrdu) hadith.textUrdu.ifBlank { hadith.textEn } else hadith.textEn.ifBlank { hadith.textUrdu }
+    val ref = if (isUrdu) {
+        "${vm.t("bukhari")} — ${vm.t("hadith")} ${hadith.number}"
+    } else {
+        val section = if (hadith.section.isNotBlank()) " · ${hadith.section}" else ""
+        "${vm.t("bukhari")}$section — ${vm.t("hadith")} ${hadith.number}"
+    }
+    AnimatedContent(
+        targetState = hadith.number,
+        transitionSpec = { fadeIn(animationSpec = tween(400)) togetherWith fadeOut(animationSpec = tween(300)) },
+        label = "hadith"
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(
-                ayat.arabic,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1B5E20),
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (ayat.urdu.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(ayat.urdu, fontSize = 13.sp, color = Color.DarkGray, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        Card(
+            Modifier.fillMaxWidth().animateContentSize(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2EA))
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📖", fontSize = 14.sp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(vm.t("dailyHadith"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text,
+                    fontSize = if (isUrdu) 17.sp else 14.sp,
+                    fontFamily = if (isUrdu) UrduFontFamily else null,
+                    color = Color(0xFF1B5E20),
+                    textAlign = if (isUrdu) TextAlign.End else TextAlign.Start,
+                    lineHeight = if (isUrdu) 32.sp else 20.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(ref, fontSize = 11.sp, color = Green, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
             }
-            Spacer(Modifier.height(4.dp))
-            Text(ayat.ref, fontSize = 11.sp, color = Green, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -727,7 +856,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
                 if (isAdmin && members.isNotEmpty()) {
                     Text(vm.t("memberName"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                     Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = 0 }.padding(vertical = 4.dp)) {
-                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); memberId = 0 }); Text("Admin")
+                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); memberId = 0 }); Text(vm.t("admin"))
                     }
                     members.forEach { m ->
                         Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = m.id }.padding(vertical = 4.dp)) {

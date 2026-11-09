@@ -68,7 +68,7 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
                 Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${categoryIcon(c.name)} ${c.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("${categoryIcon(c.name)} ${vm.catName(c)}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             if (isAdmin) Text("🗑", modifier = Modifier.clickable { confirmDelete = c })
                         }
                         Text(fmtRs(total), color = if (c.type == "IN") Green else Red, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -111,7 +111,7 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back") }
-            Text("${categoryIcon(cat.name)} ${cat.name}", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("${categoryIcon(cat.name)} ${vm.catName(cat)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             ThreeDotMenu(vm)
         }
         Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
@@ -131,8 +131,8 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(if (e.type == "IN") "↓" else "↑", fontSize = 20.sp, color = if (e.type == "IN") Green else Red)
                         Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                            Text(if (e.note.isNotBlank()) e.note else cat.name, fontWeight = FontWeight.Bold)
-                            Text("${shortDate(e.dateMillis, vm.lang.value)} • ${e.memberName}", fontSize = 12.sp, color = Color.Gray)
+                            Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else vm.catName(cat), fontWeight = FontWeight.Bold)
+                            Text("${shortDate(e.dateMillis, vm.lang.value)} • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Color.Gray)
                             if (e.receiptUri.isNotEmpty()) Text("📷 ${vm.t("receiptPhoto")}", fontSize = 11.sp, color = Green)
                         }
                         Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), fontWeight = FontWeight.Bold, color = if (e.type == "IN") Green else Red)
@@ -261,7 +261,7 @@ fun CurrencyCalc(vm: AppViewModel) {
                 Button(onClick = {
                     val v = editVal.trim().toDoubleOrNull()
                     if (v != null && v > 0) { keyboardController?.hide(); vm.setRate(editCur, v); editVal = ""; editMode = false }
-                    else vm.showToast("Enter a valid number")
+                    else vm.showToast(vm.t("enterValidNumber"))
                 }) { Text(vm.t("save")) }
             }
         }
@@ -311,14 +311,14 @@ fun UnitConverter(vm: AppViewModel) {
     var tempTo by remember { mutableStateOf("F") }
 
     Column {
-        Text(group, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+        Text(unitGroupLabel(vm, group), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
         UnitDrop(groups.keys.toList() + "Temperature", group, { g ->
             if (g == "Temperature") {
                 group = g
             } else {
                 group = g; from = groups[g]!![0].first; to = groups[g]!![1].first
             }
-        }, Modifier.fillMaxWidth())
+        }, Modifier.fillMaxWidth(), label = { unitGroupLabel(vm, it) })
         Spacer(Modifier.height(8.dp))
         if (group == "Temperature") {
             OutlinedTextField(value = tempC, onValueChange = { tempC = it }, label = { Text("°C") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
@@ -339,12 +339,30 @@ fun UnitConverter(vm: AppViewModel) {
 }
 
 @Composable
-fun UnitDrop(list: List<String>, value: String, onPick: (String) -> Unit, modifier: Modifier = Modifier) {
+// Translated display name for a unit-converter group key (stored key stays English).
+fun unitGroupLabel(vm: AppViewModel, key: String): String = when (key) {
+    "Length" -> vm.t("unitLength")
+    "Weight" -> vm.t("unitWeight")
+    "Volume" -> vm.t("unitVolume")
+    "Area" -> vm.t("unitArea")
+    "Speed" -> vm.t("unitSpeed")
+    "Time" -> vm.t("unitTime")
+    "Pressure" -> vm.t("unitPressure")
+    "Energy" -> vm.t("unitEnergy")
+    "Power" -> vm.t("unitPower")
+    "Data" -> vm.t("unitData")
+    "Fuel" -> vm.t("unitFuel")
+    "Temperature" -> vm.t("unitTemperature")
+    else -> key
+}
+
+@Composable
+fun UnitDrop(list: List<String>, value: String, onPick: (String) -> Unit, modifier: Modifier = Modifier, label: (String) -> String = { it }) {
     var ex by remember { mutableStateOf(false) }
     Box(modifier) {
-        OutlinedButton(onClick = { ex = true }, modifier = Modifier.fillMaxWidth()) { Text(value) }
+        OutlinedButton(onClick = { ex = true }, modifier = Modifier.fillMaxWidth()) { Text(label(value)) }
         DropdownMenu(expanded = ex, onDismissRequest = { ex = false }) {
-            list.forEach { c -> DropdownMenuItem(text = { Text(c) }, onClick = { onPick(c); ex = false }) }
+            list.forEach { c -> DropdownMenuItem(text = { Text(label(c)) }, onClick = { onPick(c); ex = false }) }
         }
     }
 }
@@ -381,7 +399,7 @@ fun ReportScreen(vm: AppViewModel) {
                     val mIn = entries.filter { e -> e.type == "IN" && Calendar.getInstance().apply { timeInMillis = e.dateMillis }.get(Calendar.MONTH) == c.get(Calendar.MONTH) }.sumOf { it.amount }
                     val mOut = entries.filter { e -> e.type == "OUT" && Calendar.getInstance().apply { timeInMillis = e.dateMillis }.get(Calendar.MONTH) == c.get(Calendar.MONTH) }.sumOf { it.amount }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text(SimpleDateFormat("MMM", Locale.ENGLISH).format(c.time), modifier = Modifier.width(40.dp), fontSize = 12.sp)
+                        Text(Strings.get(vm.lang.value, listOf("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec")[c.get(Calendar.MONTH)]), modifier = Modifier.width(40.dp), fontSize = 12.sp)
                         Canvas(Modifier.weight(1f).height(14.dp)) {
                             val w = size.width
                             drawRect(Green, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w * (mIn.toFloat() / maxV.toFloat().coerceAtLeast(1f)), 6f))
@@ -390,7 +408,7 @@ fun ReportScreen(vm: AppViewModel) {
                         Text(fmtRs(mOut), fontSize = 11.sp)
                     }
                 }
-                Text("■ In  ■ Out", fontSize = 11.sp, color = Color.Gray)
+                Text("■ ${vm.t("in")}  ■ ${vm.t("out")}", fontSize = 11.sp, color = Color.Gray)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -398,7 +416,7 @@ fun ReportScreen(vm: AppViewModel) {
         categories.forEach { c ->
             val list = entries.filter { it.categoryId == c.id }
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(c.name)
+                Text(vm.catName(c))
                 Text("${list.size} • ${fmtRs(list.sumOf { it.amount })}", color = Color.Gray)
             }
         }
@@ -419,10 +437,10 @@ fun SearchScreen(vm: AppViewModel) {
         Spacer(Modifier.height(8.dp))
         if (q.isBlank()) Text(vm.t("searchHint"), color = Color.Gray)
         filtered.forEach { e ->
-            val cat = categories.firstOrNull { it.id == e.categoryId }?.name ?: ""
+            val cat = categories.firstOrNull { it.id == e.categoryId }?.let { vm.catName(it) } ?: ""
             Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column { Text(if (e.note.isNotBlank()) e.note else cat, fontWeight = FontWeight.Bold); Text("${shortDate(e.dateMillis, vm.lang.value)} • $cat • ${e.memberName}", fontSize = 12.sp, color = Color.Gray) }
+                    Column { Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else cat, fontWeight = FontWeight.Bold); Text("${shortDate(e.dateMillis, vm.lang.value)} • $cat • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Color.Gray) }
                     Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), color = if (e.type == "IN") Green else Red, fontWeight = FontWeight.Bold)
                 }
             }
@@ -441,10 +459,10 @@ fun PlannedScreen(vm: AppViewModel) {
     var day by remember { mutableStateOf("1") }
     Column {
         rec.forEach { r ->
-            val cat = categories.firstOrNull { it.id == r.categoryId }?.name ?: ""
+            val cat = categories.firstOrNull { it.id == r.categoryId }?.let { vm.catName(it) } ?: ""
             Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column { Text(cat, fontWeight = FontWeight.Bold); Text("${fmtRs(r.amount)} • ${vm.t("everyMonth")} • Day ${r.dayOfMonth}", fontSize = 12.sp, color = Color.Gray) }
+                    Column { Text(cat, fontWeight = FontWeight.Bold); Text("${fmtRs(r.amount)} • ${vm.t("everyMonth")} • ${vm.t("day")} ${r.dayOfMonth}", fontSize = 12.sp, color = Color.Gray) }
                     TextButton(onClick = { vm.deleteRecurring(r.id) }) { Text(vm.t("delete"), color = Red) }
                 }
             }
@@ -455,7 +473,7 @@ fun PlannedScreen(vm: AppViewModel) {
         OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = day, onValueChange = { if (it.all { c -> c.isDigit() }) day = it }, label = { Text("${vm.t("date")} (1-28)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         categories.forEach { c ->
-            Row(Modifier.clickable { catId = c.id }.padding(vertical = 4.dp)) { RadioButton(selected = catId == c.id, onClick = { catId = c.id }); Text(c.name) }
+            Row(Modifier.clickable { catId = c.id }.padding(vertical = 4.dp)) { RadioButton(selected = catId == c.id, onClick = { catId = c.id }); Text(vm.catName(c)) }
         }
         Button(onClick = { val a = amount.toLongOrNull() ?: 0L; val d = day.toIntOrNull() ?: 1; if (a > 0 && catId != 0) { vm.addRecurring(catId, a, note, d.coerceIn(1, 28)); amount = ""; note = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth()) { Text(vm.t("save")) }
     }
@@ -505,7 +523,7 @@ fun BudgetScreen(vm: AppViewModel) {
             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                 Column(Modifier.padding(12.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(c.name, fontWeight = FontWeight.Bold)
+                        Text(vm.catName(c), fontWeight = FontWeight.Bold)
                         Row {
                             TextButton(onClick = { editing = c; amt = b?.amount?.toString() ?: "" }) { Text(vm.t("setBudget")) }
                             TextButton(onClick = { confirmDelete = c }) { Text("🗑", fontSize = 16.sp) }
@@ -523,14 +541,14 @@ fun BudgetScreen(vm: AppViewModel) {
         }
     }
     if (editing != null) {
-        AlertDialog(onDismissRequest = { editing = null }, title = { Text("${vm.t("setBudget")} — ${editing!!.name}") },
+        AlertDialog(onDismissRequest = { editing = null }, title = { Text("${vm.t("setBudget")} — ${vm.catName(editing!!)}") },
             text = { OutlinedTextField(value = amt, onValueChange = { if (it.all { c -> c.isDigit() }) amt = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth()) },
             confirmButton = { Button(onClick = { amt.toLongOrNull()?.let { vm.setBudget(editing!!.id, it) }; editing = null }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("save")) } },
             dismissButton = { TextButton(onClick = { editing = null }) { Text(vm.t("cancel")) } })
     }
     if (confirmDelete != null) {
         AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text(vm.t("confirmDelete")) },
-            text = { Text(confirmDelete!!.name) },
+            text = { Text(vm.catName(confirmDelete!!)) },
             confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red)) { Text(vm.t("delete")) } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(vm.t("cancel")) } })
     }
