@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -597,106 +598,272 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     val viewer by vm.viewer.collectAsState()
     val hadith by vm.dailyHadith.collectAsState()
     LaunchedEffect(Unit) { vm.fetchDailyHadith() }
-    var showEntry by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
+    var showEntry by remember { mutableStateOf<String?>(null) }
     var showShortcutPicker by remember { mutableStateOf<Int?>(null) }
 
     val topCat = categories.filter { it.type == "OUT" }
         .map { c -> c to entries.filter { e -> e.categoryId == c.id && e.type == "OUT" }.sumOf { it.amount } }
         .maxByOrNull { it.second }
 
-    // Static one-screen layout: no scroll
     Column(
-        Modifier.fillMaxSize().background(Bg).padding(horizontal = 12.dp, vertical = 6.dp)
+        Modifier.fillMaxSize().background(Bg).padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(vm.t("appName"), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(if (isAdmin) "👑 ${vm.t("adminAccess")}" else "👤 ${viewer?.name ?: ""}", fontSize = 11.sp, color = Green,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F2EA)).padding(horizontal = 8.dp, vertical = 4.dp))
+        // Compact app bar
+        Row(
+            Modifier.fillMaxWidth().height(44.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                vm.t("appName"),
+                fontSize = 21.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF18382D),
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                if (isAdmin) "👑 ${vm.t("adminAccess")}" else "👤 ${viewer?.name ?: ""}",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Green,
+                modifier = Modifier.clip(RoundedCornerShape(50))
+                    .background(Color(0xFFE3F2EA))
+                    .padding(horizontal = 11.dp, vertical = 7.dp)
+            )
             ThreeDotMenu(vm)
         }
-        // Balance card
-        Card(
-            Modifier.fillMaxWidth().animateContentSize(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Green)
+
+        // Scrollable dashboard content; primary actions stay anchored at the bottom.
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(Modifier.padding(14.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(vm.t("balanceInHand"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(fullDate(System.currentTimeMillis(), lang), color = Color.White, fontSize = 11.sp,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 3.dp))
-                }
-                Text(fmtRs(dash.balance), color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                Text(vm.t("amountWithYou"), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)).padding(10.dp)) {
-                        Column { Text(vm.t("totalIn"), color = Color.White, fontSize = 11.sp); Text(fmtRs(dash.totalIn), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-                    }
-                    Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)).padding(10.dp)) {
-                        Column { Text(vm.t("totalOut"), color = Color.White, fontSize = 11.sp); Text(fmtRs(dash.totalOut), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        // Top expense card (slim, one-line label)
-        if (topCat != null && topCat.second > 0) {
-            Card(
-                Modifier.fillMaxWidth().clickable { onGo(Screen.CategoryDetail(topCat.first.id)) },
-                shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)
+            // Main balance card
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF087653), Color(0xFF004D38))
+                        )
+                    )
             ) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🔥", fontSize = 26.sp)
-                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text(vm.t("topExpense"), fontSize = 11.sp, color = Color.Gray, maxLines = 1)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(vm.catName(topCat.first), fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                            Text("  •  ${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}", fontSize = 12.sp, color = Color.Gray)
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            vm.t("balanceInHand").uppercase(),
+                            color = Color.White.copy(alpha = 0.88f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.7.sp
+                        )
+                        Text(
+                            fullDate(System.currentTimeMillis(), lang),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            modifier = Modifier.clip(RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = 0.16f))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        fmtRs(dash.balance),
+                        color = Color.White,
+                        fontSize = 35.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.7).sp
+                    )
+                    Text(
+                        vm.t("amountWithYou"),
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 11.sp
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+                                .background(Color.White.copy(alpha = 0.13f)).padding(12.dp)
+                        ) {
+                            Text(vm.t("totalIn"), color = Color.White.copy(alpha = 0.78f), fontSize = 10.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(fmtRs(dash.totalIn), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+                                .background(Color.White.copy(alpha = 0.13f)).padding(12.dp)
+                        ) {
+                            Text(vm.t("totalOut"), color = Color.White.copy(alpha = 0.78f), fontSize = 10.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(fmtRs(dash.totalOut), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    Text(fmtRs(topCat.second), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Red)
-                    Text(" ›", fontSize = 20.sp, color = Color.Gray)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-        }
-        // 6 customizable shortcuts 3+3
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(0 to 2, 3 to 5).forEach { (a, b) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (i in a..b) {
-                        val key = shortcuts.getOrNull(i) ?: ""
+
+            // Highest-spend category
+            if (topCat != null && topCat.second > 0) {
+                Card(
+                    Modifier.fillMaxWidth().clickable { onGo(Screen.CategoryDetail(topCat.first.id)) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(
-                            Modifier.weight(1f).height(76.dp).clip(RoundedCornerShape(12.dp))
-                                .background(Color.White).combinedClickable(
-                                    onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
-                                    onLongClick = { showShortcutPicker = i }
-                                ),
+                            Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFFFF1E8)),
                             contentAlignment = Alignment.Center
-                        ) {
-                            if (key.isBlank()) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("+", fontSize = 18.sp, color = Color.Gray)
-                                    Text(vm.t("addShortcut"), fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        ) { Text("🔥", fontSize = 21.sp) }
+                        Column(Modifier.weight(1f).padding(start = 11.dp)) {
+                            Text(vm.t("topExpense"), fontSize = 10.sp, color = Color(0xFF7B8982), fontWeight = FontWeight.Medium)
+                            Text(vm.catName(topCat.first), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E), maxLines = 1)
+                            Text(
+                                "${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}",
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        Text(fmtRs(topCat.second), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Red)
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.LightGray)
+                    }
+                }
+            }
+
+            // Customizable shortcut grid
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(vm.t("categories"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E))
+                listOf(0 to 2, 3 to 5).forEach { (a, b) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        for (i in a..b) {
+                            val key = shortcuts.getOrNull(i) ?: ""
+                            Column(
+                                Modifier.weight(1f).height(88.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(CardWhite)
+                                    .combinedClickable(
+                                        onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
+                                        onLongClick = { showShortcutPicker = i }
+                                    )
+                                    .padding(horizontal = 5.dp, vertical = 10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    Modifier.size(39.dp).clip(RoundedCornerShape(13.dp))
+                                        .background(Color(0xFFF0F6F2)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(if (key.isBlank()) "+" else shortcutIcon(key, categories), fontSize = if (key.isBlank()) 23.sp else 20.sp, color = Green)
                                 }
-                            } else {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(shortcutIcon(key, categories), fontSize = 20.sp)
-                                    Text(shortcutLabel(vm, key), fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
-                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    if (key.isBlank()) vm.t("addShortcut") else shortcutLabel(vm, key),
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF43534B),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
                 }
             }
+
+            // Daily Hadith remains available, in a more compact card.
+            DailyHadithCard(vm, hadith)
+
+            // Recent activity, derived from the existing local entries.
+            if (entries.isNotEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(CardWhite).padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(vm.t("entries"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E))
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            vm.t("categories"),
+                            fontSize = 10.sp,
+                            color = Green,
+                            modifier = Modifier.clickable { onGo(Screen.Categories) }
+                        )
+                    }
+                    entries.take(3).forEachIndexed { index, entry ->
+                        val cat = categories.firstOrNull { it.id == entry.categoryId }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(if (entry.type == "IN") Color(0xFFE8F5EE) else Color(0xFFFFEEF0)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(if (entry.type == "IN") "↓" else "↑", color = if (entry.type == "IN") Green else Red, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                                Text(
+                                    if (entry.note.isNotBlank()) vm.noteDisplay(entry.note) else cat?.let { vm.catName(it) } ?: vm.t("entries"),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF263A31),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${shortDate(entry.dateMillis, lang)} • ${vm.memberDisplayName(entry.memberName)}",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    maxLines = 1
+                                )
+                            }
+                            Text(
+                                (if (entry.type == "IN") "+ " else "− ") + fmtRs(entry.amount),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (entry.type == "IN") Green else Red
+                            )
+                        }
+                        if (index < minOf(entries.size, 3) - 1) {
+                            HorizontalDivider(color = Color(0xFFF0F2F0), thickness = 1.dp)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        DailyHadithCard(vm, hadith)
-        Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { showEntry = "IN" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text(vm.t("moneyIn"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-            Button(onClick = { showEntry = "OUT" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Red), shape = RoundedCornerShape(14.dp)) { Text(vm.t("expense"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                onClick = { showEntry = "IN" },
+                modifier = Modifier.weight(1f).height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087653)),
+                shape = RoundedCornerShape(17.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(vm.t("moneyIn"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = { showEntry = "OUT" },
+                modifier = Modifier.weight(1f).height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD7264D)),
+                shape = RoundedCornerShape(17.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Icon(Icons.Filled.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(vm.t("expense"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 
