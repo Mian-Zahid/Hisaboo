@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -39,7 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -525,7 +528,6 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                         Column { Text(vm.t("totalOut"), color = Color.White, fontSize = 11.sp); Text(fmtRs(dash.totalOut), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                     }
                 }
-                Text(vm.t("balanceNeverResets"), color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -653,6 +655,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
     var memberId by remember { mutableStateOf(0) }
     var receiptUri by remember { mutableStateOf("") }
     val ctx = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) receiptUri = uri.toString()
     }
@@ -669,26 +672,26 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
         title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense")) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
                 if (categoryId == null) {
                     Text(vm.t("category"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                     categories.filter { it.type == type }.forEach { c ->
-                        Row(Modifier.fillMaxWidth().clickable { catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = catId == c.id, onClick = { catId = c.id })
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); catId = c.id })
                             Text(c.name)
                         }
                     }
                 }
                 if (isAdmin && members.isNotEmpty()) {
                     Text(vm.t("memberName"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    Row(Modifier.fillMaxWidth().clickable { memberId = 0 }.padding(vertical = 4.dp)) {
-                        RadioButton(selected = memberId == 0, onClick = { memberId = 0 }); Text("Admin")
+                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = 0 }.padding(vertical = 4.dp)) {
+                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); memberId = 0 }); Text("Admin")
                     }
                     members.forEach { m ->
-                        Row(Modifier.fillMaxWidth().clickable { memberId = m.id }.padding(vertical = 4.dp)) {
-                            RadioButton(selected = memberId == m.id, onClick = { memberId = m.id }); Text(m.name)
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = m.id }.padding(vertical = 4.dp)) {
+                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); memberId = m.id }); Text(m.name)
                         }
                     }
                 }
@@ -707,6 +710,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
         },
         confirmButton = {
             Button(onClick = {
+                keyboardController?.hide()
                 val amt = amount.toLongOrNull() ?: 0L
                 if (amt > 0 && catId != 0) {
                     val mName = if (memberId == 0) "Admin" else members.firstOrNull { it.id == memberId }?.name ?: "Admin"

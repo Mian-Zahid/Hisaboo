@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +52,7 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
     var newType by remember { mutableStateOf("OUT") }
     var confirmDelete by remember { mutableStateOf<Category?>(null) }
     val isAdmin by vm.isAdmin.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Column(Modifier.fillMaxSize().background(Bg).padding(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -79,11 +83,11 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
         AlertDialog(onDismissRequest = { showAdd = false }, title = { Text(vm.t("newCategory")) },
             text = {
                 Column {
-                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text(vm.t("categoryName")) }, modifier = Modifier.fillMaxWidth())
-                    Row { RadioButton(selected = newType == "IN", onClick = { newType = "IN" }); Text(vm.t("income")); RadioButton(selected = newType == "OUT", onClick = { newType = "OUT" }); Text(vm.t("expenseType")) }
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, label = { Text(vm.t("categoryName")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+                    Row { RadioButton(selected = newType == "IN", onClick = { keyboardController?.hide(); newType = "IN" }); Text(vm.t("income")); RadioButton(selected = newType == "OUT", onClick = { keyboardController?.hide(); newType = "OUT" }); Text(vm.t("expenseType")) }
                 }
             },
-            confirmButton = { Button(onClick = { if (newName.isNotBlank()) { vm.addCategory(newName.trim(), newType); newName = ""; showAdd = false } }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("add")) } },
+            confirmButton = { Button(onClick = { keyboardController?.hide(); if (newName.isNotBlank()) { vm.addCategory(newName.trim(), newType); newName = ""; showAdd = false } }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("add")) } },
             dismissButton = { TextButton(onClick = { showAdd = false }) { Text(vm.t("cancel")) } })
     }
     if (confirmDelete != null) {
@@ -223,6 +227,7 @@ fun CurrencyCalc(vm: AppViewModel) {
     val rates by vm.rates.collectAsState()
     val live by vm.ratesLive.collectAsState()
     val updated by vm.ratesUpdated.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
     var amount by remember { mutableStateOf("1000") }
     var from by remember { mutableStateOf("USD") }
     var to by remember { mutableStateOf("PKR") }
@@ -238,7 +243,7 @@ fun CurrencyCalc(vm: AppViewModel) {
     Column(Modifier.verticalScroll(rememberScrollState())) {
         Text(if (live) "● ${vm.t("liveRates")}" else "○ ${vm.t("offlineRates")}", color = if (live) Green else Color.Gray, fontSize = 12.sp)
         if (updated.isNotEmpty()) Text("${vm.t("lastUpdated")}: $updated", fontSize = 12.sp, color = Color.Gray)
-        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CurrencyDrop(currencies, from, { from = it }, Modifier.weight(1f))
             IconButton(onClick = { val t = from; from = to; to = t }, modifier = Modifier.align(Alignment.CenterVertically)) { Icon(Icons.Filled.SwapHoriz, contentDescription = "Swap") }
@@ -248,12 +253,16 @@ fun CurrencyCalc(vm: AppViewModel) {
             Text("$amount $from = ${"%,.2f".format(result)} $to", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(14.dp))
         }
         Button(onClick = { vm.fetchRates() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("updateRates"), fontWeight = FontWeight.Bold, maxLines = 1) }
-        OutlinedButton(onClick = { editMode = !editMode }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("editRates"), maxLines = 1) }
+        OutlinedButton(onClick = { if (!editMode) editVal = (rates[editCur] ?: 0.0).toString(); editMode = !editMode }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("editRates"), maxLines = 1) }
         if (editMode) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                CurrencyDrop(currencies, editCur, { editCur = it }, Modifier.weight(1f))
-                OutlinedTextField(value = editVal, onValueChange = { editVal = it }, label = { Text("PKR / 1 $editCur") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                Button(onClick = { editVal.toDoubleOrNull()?.let { vm.setRate(editCur, it) } }) { Text(vm.t("save")) }
+                CurrencyDrop(currencies, editCur, { editCur = it; editVal = (rates[it] ?: 0.0).toString() }, Modifier.weight(1f))
+                OutlinedTextField(value = editVal, onValueChange = { editVal = it }, label = { Text("PKR / 1 $editCur") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.weight(1f))
+                Button(onClick = {
+                    val v = editVal.trim().toDoubleOrNull()
+                    if (v != null && v > 0) { keyboardController?.hide(); vm.setRate(editCur, v); editVal = ""; editMode = false }
+                    else vm.showToast("Enter a valid number")
+                }) { Text(vm.t("save")) }
             }
         }
     }
@@ -272,6 +281,7 @@ fun CurrencyDrop(list: List<String>, value: String, onPick: (String) -> Unit, mo
 
 @Composable
 fun UnitConverter(vm: AppViewModel) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     val groups = mapOf(
         "Length" to listOf("m" to 1.0, "km" to 1000.0, "cm" to 0.01, "mm" to 0.001, "ft" to 0.3048, "in" to 0.0254, "yd" to 0.9144, "mi" to 1609.34),
         "Weight" to listOf("kg" to 1.0, "g" to 0.001, "mg" to 0.000001, "lb" to 0.453592, "oz" to 0.0283495, "t" to 1000.0),
@@ -311,14 +321,14 @@ fun UnitConverter(vm: AppViewModel) {
         }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         if (group == "Temperature") {
-            OutlinedTextField(value = tempC, onValueChange = { tempC = it }, label = { Text("°C") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = tempC, onValueChange = { tempC = it }, label = { Text("°C") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
             val c = tempC.toDoubleOrNull() ?: 0.0
             Text("°F: ${"%.1f".format(c * 9 / 5 + 32)}   •   K: ${"%.1f".format(c + 273.15)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
         } else {
-            OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 UnitDrop(units.map { it.first }, from, { from = it }, Modifier.weight(1f))
-                Text("→", fontSize = 22.sp, modifier = Modifier.align(Alignment.CenterVertically))
+                IconButton(onClick = { val t = from; from = to; to = t }, modifier = Modifier.align(Alignment.CenterVertically)) { Icon(Icons.Filled.SwapHoriz, contentDescription = "Swap") }
                 UnitDrop(units.map { it.first }, to, { to = it }, Modifier.weight(1f))
             }
             Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
@@ -533,6 +543,7 @@ fun LoanScreen(vm: AppViewModel) {
     var person by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf("lend") }
+    val keyboardController = LocalSoftwareKeyboardController.current
     Column {
         list.forEach { u ->
             Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
@@ -548,10 +559,10 @@ fun LoanScreen(vm: AppViewModel) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = person, onValueChange = { person = it }, label = { Text(vm.t("person")) }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Row { RadioButton(selected = kind == "lend", onClick = { kind = "lend" }); Text(vm.t("toReceive")); RadioButton(selected = kind == "borrow", onClick = { kind = "borrow" }); Text(vm.t("toReturn")) }
-        Button(onClick = { val a = amount.toLongOrNull() ?: 0L; if (person.isNotBlank() && a > 0) { vm.addUdhar(person, a, kind); person = ""; amount = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth()) { Text(vm.t("add")) }
+        OutlinedTextField(value = person, onValueChange = { person = it }, label = { Text(vm.t("person")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+        Row { RadioButton(selected = kind == "lend", onClick = { keyboardController?.hide(); kind = "lend" }); Text(vm.t("toReceive")); RadioButton(selected = kind == "borrow", onClick = { keyboardController?.hide(); kind = "borrow" }); Text(vm.t("toReturn")) }
+        Button(onClick = { keyboardController?.hide(); val a = amount.toLongOrNull() ?: 0L; if (person.isNotBlank() && a > 0) { vm.addUdhar(person, a, kind); person = ""; amount = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth()) { Text(vm.t("add")) }
     }
 }
 
@@ -562,6 +573,7 @@ fun BillsScreen(vm: AppViewModel) {
     var provider by remember { mutableStateOf("LESCO") }
     var amount by remember { mutableStateOf("") }
     var due by remember { mutableStateOf("") }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val providers = listOf("LESCO", "K-Electric", "SNGPL", "SSGC", "WASA", "PTCL", "Internet", "Other")
     Column {
         list.forEach { b ->
@@ -579,12 +591,13 @@ fun BillsScreen(vm: AppViewModel) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(vm.t("title")) }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(vm.t("title")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
         var ex by remember { mutableStateOf(false) }
-        Box { OutlinedButton(onClick = { ex = true }, modifier = Modifier.fillMaxWidth()) { Text(provider) }; DropdownMenu(expanded = ex, onDismissRequest = { ex = false }) { providers.forEach { p -> DropdownMenuItem(text = { Text(p) }, onClick = { provider = p; ex = false }) } } }
-        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = due, onValueChange = { due = it }, label = { Text("${vm.t("dueDate")} DD/MM/YYYY") }, modifier = Modifier.fillMaxWidth())
+        Box { OutlinedButton(onClick = { keyboardController?.hide(); ex = true }, modifier = Modifier.fillMaxWidth()) { Text(provider) }; DropdownMenu(expanded = ex, onDismissRequest = { ex = false }) { providers.forEach { p -> DropdownMenuItem(text = { Text(p) }, onClick = { provider = p; ex = false }) } } }
+        OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = due, onValueChange = { due = it }, label = { Text("${vm.t("dueDate")} DD/MM/YYYY") }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
         Button(onClick = {
+            keyboardController?.hide()
             val a = amount.toLongOrNull() ?: 0L
             val parts = due.split("/").mapNotNull { it.toIntOrNull() }
             if (name.isNotBlank() && a > 0 && parts.size == 3) {
@@ -604,12 +617,13 @@ fun ZakatScreen(vm: AppViewModel) {
     var debts by remember { mutableStateOf("") }
     var dateStr by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    val keyboardController = LocalSoftwareKeyboardController.current
     Column {
         listOf(vm.t("cashInHand") to { v: String -> cash = v }, vm.t("goldValue") to { v: String -> gold = v }, vm.t("silverValue") to { v: String -> silver = v }, vm.t("otherAssets") to { v: String -> other = v }, vm.t("debtsToPay") to { v: String -> debts = v }).forEach { (label, set) ->
-            OutlinedTextField(value = when (label) { vm.t("cashInHand") -> cash; vm.t("goldValue") -> gold; vm.t("silverValue") -> silver; vm.t("otherAssets") -> other; else -> debts }, onValueChange = { if (it.all { c -> c.isDigit() }) set(it) }, label = { Text(label) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = when (label) { vm.t("cashInHand") -> cash; vm.t("goldValue") -> gold; vm.t("silverValue") -> silver; vm.t("otherAssets") -> other; else -> debts }, onValueChange = { if (it.all { c -> c.isDigit() }) set(it) }, label = { Text(label) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
         }
-        OutlinedTextField(value = dateStr, onValueChange = { dateStr = it }, label = { Text(vm.t("zakatDate")) }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { result = vm.zakat(cash.toLongOrNull() ?: 0, gold.toLongOrNull() ?: 0, silver.toLongOrNull() ?: 0, other.toLongOrNull() ?: 0, debts.toLongOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("calculate")) }
+        OutlinedTextField(value = dateStr, onValueChange = { dateStr = it }, label = { Text(vm.t("zakatDate")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+        Button(onClick = { keyboardController?.hide(); result = vm.zakat(cash.toLongOrNull() ?: 0, gold.toLongOrNull() ?: 0, silver.toLongOrNull() ?: 0, other.toLongOrNull() ?: 0, debts.toLongOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("calculate")) }
         result?.let { (wealth, zakat) ->
             Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
                 Column(Modifier.padding(14.dp)) {

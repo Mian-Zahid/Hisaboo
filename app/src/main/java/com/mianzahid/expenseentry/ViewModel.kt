@@ -356,34 +356,44 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
 
     fun fetchRates() {
         viewModelScope.launch {
-            try {
-                val url = URL("https://open.er-api.com/v6/latest/USD")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 8000; conn.readTimeout = 8000
-                val text = conn.inputStream.bufferedReader().readText()
-                val j = JSONObject(text).getJSONObject("rates")
-                val map = mutableMapOf<String, Double>()
-                listOf("PKR","EUR","GBP","AED","SAR","INR","CNY","JPY","AUD","CAD").forEach { c ->
-                    if (j.has(c)) map[c] = j.getDouble(c)
+            // Try the primary API, then a fallback mirror. Timeouts are generous
+            // because the owner's mobile data is slow (8s was timing out).
+            val endpoints = listOf(
+                "https://open.er-api.com/v6/latest/USD",
+                "https://api.exchangerate-api.com/v4/latest/USD"
+            )
+            for (endpoint in endpoints) {
+                try {
+                    val url = URL(endpoint)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 20000; conn.readTimeout = 30000
+                    val text = conn.inputStream.bufferedReader().readText()
+                    val j = JSONObject(text).getJSONObject("rates")
+                    val map = mutableMapOf<String, Double>()
+                    listOf("PKR","EUR","GBP","AED","SAR","INR","CNY","JPY","AUD","CAD").forEach { c ->
+                        if (j.has(c)) map[c] = j.getDouble(c)
+                    }
+                    map["USD"] = 1.0
+                    // store as PKR per 1 unit: invert USD-based rates (rates are per USD)
+                    val pkrPerUsd = map["PKR"] ?: 276.63
+                    val out = mutableMapOf<String, Double>()
+                    out["PKR"] = 1.0
+                    out["USD"] = pkrPerUsd
+                    map.forEach { (k, v) -> if (k != "PKR" && k != "USD") out[k] = pkrPerUsd / v }
+                    _rates.value = out
+                    _ratesLive.value = true
+                    val stamp = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.ENGLISH).format(Date())
+                    _ratesUpdated.value = stamp
+                    prefs.edit().putString("rates_updated", stamp).apply()
+                    dao.putSetting(Setting("rates", JSONObject(out as Map<*, *>).toString()))
+                    showToast("Rates updated")
+                    return@launch
+                } catch (_: Exception) {
+                    // try the next endpoint
                 }
-                map["USD"] = 1.0
-                // store as PKR per 1 unit: invert USD-based rates (rates are per USD)
-                val pkrPerUsd = map["PKR"] ?: 276.63
-                val out = mutableMapOf<String, Double>()
-                out["PKR"] = 1.0
-                out["USD"] = pkrPerUsd
-                map.forEach { (k, v) -> if (k != "PKR" && k != "USD") out[k] = pkrPerUsd / v }
-                _rates.value = out
-                _ratesLive.value = true
-                val stamp = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.ENGLISH).format(Date())
-                _ratesUpdated.value = stamp
-                prefs.edit().putString("rates_updated", stamp).apply()
-                dao.putSetting(Setting("rates", JSONObject(out as Map<*, *>).toString()))
-                showToast("Rates updated")
-            } catch (e: Exception) {
-                _ratesLive.value = false
-                showToast("No internet — using offline rates")
             }
+            _ratesLive.value = false
+            showToast("Rates update failed — using offline rates")
         }
     }
 
@@ -391,6 +401,7 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
         val m = _rates.value.toMutableMap(); m[currency] = pkrPerUnit
         _rates.value = m; _ratesLive.value = false
         viewModelScope.launch { dao.putSetting(Setting("rates", JSONObject(m as Map<*, *>).toString())) }
+        showToast("Rate saved")
     }
 
     // ---------- Backup / Restore ----------
