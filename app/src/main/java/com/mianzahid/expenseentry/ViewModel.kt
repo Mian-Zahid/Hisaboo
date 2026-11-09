@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,14 @@ fun sha256(s: String): String =
         .joinToString("") { "%02x".format(it) }
 
 fun fmtRs(v: Long): String = "Rs " + "%,d".format(v)
+
+// One Quranic verse for the Home screen: Arabic + Urdu translation + reference.
+data class DailyAyat(
+    val arabic: String,
+    val urdu: String,
+    val surahName: String,
+    val ref: String // e.g. "Surah Hud — 11:6"
+)
 
 fun fullDate(millis: Long, lang: String): String {
     val cal = Calendar.getInstance().apply { timeInMillis = millis }
@@ -106,6 +115,16 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
     val lastBackup: StateFlow<String> = _lastBackup.asStateFlow()
     private val _toast = MutableStateFlow("")
     val toast: StateFlow<String> = _toast.asStateFlow()
+    // Default verse (Surah Hud 11:6 — about rizq) shown only if no verse was
+    // ever fetched and cached (e.g. first launch with no internet).
+    private val defaultAyat = DailyAyat(
+        arabic = "وَمَا مِن دَابَّةٍ فِي الْأَرْضِ إِلَّا عَلَى اللَّهِ رِزْقُهَا وَيَعْلَمُ مُسْتَقَرَّهَا وَمُسْتَوْدَعَهَا ۚ كُلٌّ فِي كِتَابٍ مُّبِينٍ",
+        urdu = "اور زمین پر چلنے والا کوئی جاندار ایسا نہیں جس کا رزق اللہ کے ذمے نہ ہو، اور وہ اس کے ٹھہرنے کی جگہ اور سونپے جانے کی جگہ کو جانتا ہے۔ سب کچھ ایک واضح کتاب میں ہے۔",
+        surahName = "Hud",
+        ref = "Surah Hud — 11:6"
+    )
+    private val _dailyAyat = MutableStateFlow(defaultAyat)
+    val dailyAyat: StateFlow<DailyAyat> = _dailyAyat.asStateFlow()
 
     fun t(key: String): String = Strings.get(_lang.value, key)
     fun showToast(s: String) { _toast.value = s }
@@ -350,13 +369,16 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
     }
 
     fun fetchRates() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Network I/O must run off the main thread (viewModelScope defaults
+            // to Main) or Android throws NetworkOnMainThreadException.
             // Try the primary API, then a fallback mirror. Timeouts are generous
             // because the owner's mobile data is slow (8s was timing out).
             val endpoints = listOf(
                 "https://open.er-api.com/v6/latest/USD",
                 "https://api.exchangerate-api.com/v4/latest/USD"
             )
+            var lastError: Exception? = null
             for (endpoint in endpoints) {
                 try {
                     val url = URL(endpoint)
@@ -383,12 +405,85 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                     dao.putSetting(Setting("rates", JSONObject(out as Map<*, *>).toString()))
                     showToast("Rates updated")
                     return@launch
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    lastError = e
                     // try the next endpoint
                 }
             }
             _ratesLive.value = false
-            showToast("Rates update failed — using offline rates")
+            val reason = lastError?.javaClass?.simpleName ?: "Unknown"
+            showToast("Rates update failed: $reason — using offline rates")
+        }
+    }
+
+    // Daily Quranic verse for the Home screen (AlQuran Cloud API, free, no key).
+    // Verse number is derived from the date: stable within a day, new every day.
+    // Runs on Dispatchers.IO (network must never run on the main thread).
+    // Offline: shows the cached verse; if never cached, the default (Hud 11:6).
+    fun fetchDailyAyat() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())
+            // Step 1: Use today's cached verse if we already fetched it.
+            try {
+                val cached = dao.setting("daily_ayat")?.value
+                if (cached != null) {
+                    val cj = JSONObject(cached)
+                    if (cj.optString("date") == today && cj.optString("arabic").isNotBlank()) {
+                        _dailyAyat.value = DailyAyat(
+                            cj.optString("arabic"), cj.optString("urdu"),
+                            cj.optString("surah"), cj.optString("ref")
+                        )
+                        return@launch
+                    }
+                }
+            } catch (_: Exception) { /* fall through to network */ }
+            // Step 2: Fetch today's verse.
+            val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+            val number = (dayOfYear * 17 % 6236) + 1
+            try {
+                val url = URL("https://api.alquran.cloud/v1/ayah/$number/editions/quran-uthmani,ur.jalandhry")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 20000; conn.readTimeout = 30000
+                val text = conn.inputStream.bufferedReader().readText()
+                val data = JSONObject(text).getJSONArray("data")
+                var arabic = ""; var urdu = ""
+                var surahName = ""; var surahNo = 0; var ayahInSurah = 0
+                for (i in 0 until data.length()) {
+                    val ed = data.getJSONObject(i)
+                    val id = ed.optJSONObject("edition")?.optString("identifier") ?: ""
+                    val surah = ed.optJSONObject("surah")
+                    if (surah != null) {
+                        surahName = surah.optString("englishName")
+                        surahNo = surah.optInt("number")
+                    }
+                    ayahInSurah = ed.optInt("numberInSurah")
+                    if (id == "quran-uthmani") arabic = ed.optString("text")
+                    if (id == "ur.jalandhry") urdu = ed.optString("text")
+                }
+                if (arabic.isBlank()) return@launch // keep current (cached/default)
+                val ayat = DailyAyat(arabic, urdu, surahName, "Surah $surahName — $surahNo:$ayahInSurah")
+                _dailyAyat.value = ayat
+                val cj = JSONObject().apply {
+                    put("date", today); put("number", number)
+                    put("arabic", arabic); put("urdu", urdu)
+                    put("surah", surahName); put("ref", ayat.ref)
+                }
+                dao.putSetting(Setting("daily_ayat", cj.toString()))
+            } catch (_: Exception) {
+                // Offline: fall back to the last cached verse (any day), else default.
+                try {
+                    val cached = dao.setting("daily_ayat")?.value
+                    if (cached != null) {
+                        val cj = JSONObject(cached)
+                        if (cj.optString("arabic").isNotBlank()) {
+                            _dailyAyat.value = DailyAyat(
+                                cj.optString("arabic"), cj.optString("urdu"),
+                                cj.optString("surah"), cj.optString("ref")
+                            )
+                        }
+                    }
+                } catch (_: Exception) { /* keep default */ }
+            }
         }
     }
 
@@ -491,11 +586,5 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
             sb.append("${shortDate(e.dateMillis, "en")},${catMap[e.categoryId]?.name ?: ""},${e.type},${e.amount},\"${e.note.replace("\"", "'")}\",${e.memberName}\n")
         }
         return sb.toString()
-    }
-
-    fun zakat(cash: Long, gold: Long, silver: Long, other: Long, debts: Long): Pair<Long, Long> {
-        val wealth = cash + gold + silver + other - debts
-        val zakat = if (wealth > 0) (wealth * 25 / 1000) else 0
-        return Pair(wealth, zakat)
     }
 }

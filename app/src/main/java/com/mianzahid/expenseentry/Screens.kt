@@ -68,7 +68,7 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
                 Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(c.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("${categoryIcon(c.name)} ${c.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             if (isAdmin) Text("🗑", modifier = Modifier.clickable { confirmDelete = c })
                         }
                         Text(fmtRs(total), color = if (c.type == "IN") Green else Red, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -111,7 +111,7 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back") }
-            Text(cat.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("${categoryIcon(cat.name)} ${cat.name}", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             ThreeDotMenu(vm)
         }
         Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
@@ -536,7 +536,7 @@ fun BudgetScreen(vm: AppViewModel) {
     }
 }
 
-// ---------------- Loan / Bills / Zakat ----------------
+// ---------------- Loan / Bills ----------------
 @Composable
 fun LoanScreen(vm: AppViewModel) {
     val list by vm.udhar.collectAsState()
@@ -605,34 +605,6 @@ fun BillsScreen(vm: AppViewModel) {
                 vm.addBill(name, provider, a, cal.timeInMillis); name = ""; amount = ""; due = ""
             }
         }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("add")) }
-    }
-}
-
-@Composable
-fun ZakatScreen(vm: AppViewModel) {
-    var cash by remember { mutableStateOf("") }
-    var gold by remember { mutableStateOf("") }
-    var silver by remember { mutableStateOf("") }
-    var other by remember { mutableStateOf("") }
-    var debts by remember { mutableStateOf("") }
-    var dateStr by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<Pair<Long, Long>?>(null) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    Column {
-        listOf(vm.t("cashInHand") to { v: String -> cash = v }, vm.t("goldValue") to { v: String -> gold = v }, vm.t("silverValue") to { v: String -> silver = v }, vm.t("otherAssets") to { v: String -> other = v }, vm.t("debtsToPay") to { v: String -> debts = v }).forEach { (label, set) ->
-            OutlinedTextField(value = when (label) { vm.t("cashInHand") -> cash; vm.t("goldValue") -> gold; vm.t("silverValue") -> silver; vm.t("otherAssets") -> other; else -> debts }, onValueChange = { if (it.all { c -> c.isDigit() }) set(it) }, label = { Text(label) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
-        }
-        OutlinedTextField(value = dateStr, onValueChange = { dateStr = it }, label = { Text(vm.t("zakatDate")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
-        Button(onClick = { keyboardController?.hide(); result = vm.zakat(cash.toLongOrNull() ?: 0, gold.toLongOrNull() ?: 0, silver.toLongOrNull() ?: 0, other.toLongOrNull() ?: 0, debts.toLongOrNull() ?: 0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("calculate")) }
-        result?.let { (wealth, zakat) ->
-            Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Green)) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("${vm.t("totalWealth")}: ${fmtRs(wealth)}", color = Color.White, fontSize = 16.sp)
-                    Text("${vm.t("zakatDue")}: ${fmtRs(zakat)}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    if (dateStr.isNotBlank()) Text("${vm.t("zakatDate")}: $dateStr", color = Color.White)
-                }
-            }
-        }
     }
 }
 

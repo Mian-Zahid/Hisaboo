@@ -70,7 +70,6 @@ sealed class Screen {
     object Budget : Screen()
     object Loan : Screen()
     object Bills : Screen()
-    object Zakat : Screen()
     object Family : Screen()
     object Backup : Screen()
     object ChangePin : Screen()
@@ -88,7 +87,6 @@ fun shortcutLabel(vm: AppViewModel, key: String): String {
         "reminders" -> vm.t("reminders")
         "loan" -> vm.t("loan")
         "bills" -> vm.t("bills")
-        "zakat" -> vm.t("zakat")
         "family" -> vm.t("family")
         "backup" -> vm.t("backup")
         "search" -> vm.t("search")
@@ -105,7 +103,6 @@ fun shortcutToScreen(key: String): Screen = when {
     key == "reminders" -> Screen.Reminders
     key == "loan" -> Screen.Loan
     key == "bills" -> Screen.Bills
-    key == "zakat" -> Screen.Zakat
     key == "family" -> Screen.Family
     key == "backup" -> Screen.Backup
     key == "search" -> Screen.Search
@@ -191,7 +188,6 @@ class MainActivity : FragmentActivity() {
                                 is Screen.Budget -> SubPage(vm, vm.t("budget"), ::back) { BudgetScreen(vm) }
                                 is Screen.Loan -> SubPage(vm, vm.t("loan"), ::back) { LoanScreen(vm) }
                                 is Screen.Bills -> SubPage(vm, vm.t("bills"), ::back) { BillsScreen(vm) }
-                                is Screen.Zakat -> SubPage(vm, vm.t("zakat"), ::back) { ZakatScreen(vm) }
                                 is Screen.Family -> SubPage(vm, vm.t("family"), ::back) { FamilyScreen(vm) }
                                 is Screen.Backup -> SubPage(vm, vm.t("backup"), ::back) { BackupScreen(vm) }
                                 is Screen.ChangePin -> SubPage(vm, vm.t("changePin"), ::back) { ChangePinScreen(vm) }
@@ -319,7 +315,7 @@ fun ThreeDotMenu(vm: AppViewModel) {
                 "report" to vm.t("monthlyReport"), "search" to vm.t("search"),
                 "planned" to vm.t("planned"), "reminders" to vm.t("reminders"),
                 "budgets" to vm.t("budget"), "loan" to vm.t("loan"),
-                "bills" to vm.t("bills"), "zakat" to vm.t("zakat"),
+                "bills" to vm.t("bills"),
                 "family" to vm.t("family"), "backup" to vm.t("backup"),
                 "calculator" to vm.t("calculator")
             )
@@ -488,6 +484,8 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     val shortcuts by vm.shortcuts.collectAsState()
     val isAdmin by vm.isAdmin.collectAsState()
     val viewer by vm.viewer.collectAsState()
+    val ayat by vm.dailyAyat.collectAsState()
+    LaunchedEffect(Unit) { vm.fetchDailyAyat() }
     var showEntry by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
     var showShortcutPicker by remember { mutableStateOf<Int?>(null) }
 
@@ -559,7 +557,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                     for (i in a..b) {
                         val key = shortcuts.getOrNull(i) ?: ""
                         Box(
-                            Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(12.dp))
+                            Modifier.weight(1f).height(76.dp).clip(RoundedCornerShape(12.dp))
                                 .background(Color.White).combinedClickable(
                                     onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
                                     onLongClick = { showShortcutPicker = i }
@@ -573,7 +571,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                                 }
                             } else {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(shortcutIcon(key), fontSize = 20.sp)
+                                    Text(shortcutIcon(key, categories), fontSize = 20.sp)
                                     Text(shortcutLabel(vm, key), fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
                                 }
                             }
@@ -582,6 +580,8 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                 }
             }
         }
+        Spacer(Modifier.height(8.dp))
+        DailyAyatCard(ayat)
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { showEntry = "IN" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text(vm.t("moneyIn"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
@@ -614,12 +614,52 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     }
 }
 
-fun shortcutIcon(key: String): String = when {
+// Daily Quranic verse card (Home screen, below the shortcut tiles).
+// Green theme, modest height; Arabic RTL in large font, Urdu below, reference last.
+@Composable
+fun DailyAyatCard(ayat: DailyAyat) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2EA))
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(
+                ayat.arabic,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1B5E20),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (ayat.urdu.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(ayat.urdu, fontSize = 13.sp, color = Color.DarkGray, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(ayat.ref, fontSize = 11.sp, color = Green, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+fun categoryIcon(name: String): String = when (name.trim().lowercase()) {
+    "salary" -> "💰"; "business" -> "💼"; "other income" -> "💵"
+    "food" -> "🍔"; "transport" -> "🚗"; "shopping" -> "🛍️"
+    "bills" -> "🧾"; "rent" -> "🏠"; "other expense" -> "📦"
+    else -> "📁"
+}
+
+fun shortcutIcon(key: String, categories: List<Category> = emptyList()): String = when {
     key == "report" -> "📊"; key == "budgets" -> "💰"; key == "planned" -> "🔁"
     key == "reminders" -> "🔔"; key == "loan" -> "🤝"; key == "bills" -> "🧾"
-    key == "zakat" -> "🕌"; key == "family" -> "👨‍👩‍👧"; key == "backup" -> "💾"
+    key == "family" -> "👨‍👩‍👧"; key == "backup" -> "💾"
     key == "search" -> "🔍"; key == "calculator" -> "🧮"; key == "categories" -> "🗂️"
-    key.startsWith("category:") -> "📁"; else -> "📌"
+    key.startsWith("category:") -> {
+        val id = key.removePrefix("category:").toIntOrNull()
+        val name = categories.firstOrNull { it.id == id }?.name ?: ""
+        categoryIcon(name)
+    }
+    else -> "📌"
 }
 
 @Composable
@@ -630,12 +670,12 @@ fun ShortcutPicker(vm: AppViewModel, slot: Int, onPick: (String) -> Unit, onRemo
         title = { Text(vm.t("chooseShortcut")) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                listOf("report","budgets","planned","reminders","loan","bills","zakat","family","backup","search","calculator","categories").forEach { k ->
+                listOf("report","budgets","planned","reminders","loan","bills","family","backup","search","calculator","categories").forEach { k ->
                     Text(shortcutLabel(vm, k), modifier = Modifier.fillMaxWidth().clickable { onPick(k) }.padding(vertical = 8.dp))
                 }
                 Divider()
                 categories.forEach { c ->
-                    Text("📁 ${c.name}", modifier = Modifier.fillMaxWidth().clickable { onPick("category:${c.id}") }.padding(vertical = 8.dp))
+                    Text("${categoryIcon(c.name)} ${c.name}", modifier = Modifier.fillMaxWidth().clickable { onPick("category:${c.id}") }.padding(vertical = 8.dp))
                 }
             }
         },
