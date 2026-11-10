@@ -27,14 +27,16 @@ fun sha256(s: String): String =
 
 fun fmtRs(v: Long): String = "Rs " + "%,d".format(v)
 
-// One hadith for the Home screen: Urdu text + English text + book + number.
+// One hadith for the Home screen: Urdu text + English text + Arabic text + book + number.
 // The reference is always book + hadith number — never shown without it.
+// The hadith is ALWAYS shown in Urdu by default; English/Arabic are translate options.
 data class DailyHadith(
     val textUrdu: String,
     val textEn: String,
     val book: String, // e.g. "Sahih al-Bukhari"
     val number: Int, // hadith number within the book
-    val section: String // e.g. "Revelation"
+    val section: String, // e.g. "Revelation"
+    val textAr: String = "" // Arabic original
 )
 
 fun fullDate(millis: Long, lang: String): String {
@@ -136,6 +138,7 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
     private val defaultHadith = DailyHadith(
         textUrdu = "کو حمیدی نے یہ حدیث بیان کی، انہوں نے کہا کہ ہم کو سفیان نے یہ حدیث بیان کی، وہ کہتے ہیں ہم کو یحییٰ بن سعید انصاری نے یہ حدیث بیان کی، انہوں نے کہا کہ مجھے یہ حدیث محمد بن ابراہیم تیمی سے حاصل ہوئی۔ انہوں نے اس حدیث کو علقمہ بن وقاص لیثی سے سنا، ان کا بیان ہے کہ میں نے مسجد نبوی میں منبر رسول صلی اللہ علیہ وسلم پر عمر بن خطاب رضی اللہ عنہ کی زبان سے سنا، وہ فرما رہے تھے کہ میں نے جناب رسول اللہ صلی اللہ علیہ وسلم سے سنا آپ صلی اللہ علیہ وسلم فرما رہے تھے کہ تمام اعمال کا دارومدار نیت پر ہے اور ہر عمل کا نتیجہ ہر انسان کو اس کی نیت کے مطابق ہی ملے گا۔ پس جس کی ہجرت ( ترک وطن ) دولت دنیا حاصل کرنے کے لیے ہو یا کسی عورت سے شادی کی غرض ہو۔ پس اس کی ہجرت ان ہی چیزوں کے لیے ہو گی جن کے حاصل کرنے کی نیت سے اس نے ہجرت کی ہے۔",
         textEn = "Narrated 'Umar bin Al-Khattab: I heard Allah's Messenger (ﷺ) saying, \"The reward of deeds depends upon the intentions and every person will get the reward according to what he has intended. So whoever emigrated for worldly benefits or for a woman to marry, his emigration was for what he emigrated for\"",
+        textAr = "إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى، فَمَنْ كَانَتْ هِجْرَتُهُ إِلَى دُنْيَا يُصِيبُهَا أَوْ إِلَى امْرَأَةٍ يَنْكِحُهَا، فَهِجْرَتُهُ إِلَى مَا هَاجَرَ إِلَيْهِ",
         book = "Sahih al-Bukhari",
         number = 1,
         section = "Revelation"
@@ -472,35 +475,40 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                 val cached = dao.setting("daily_hadith")?.value
                 if (cached != null) {
                     val cj = JSONObject(cached)
-                    if (cj.optString("date") == today && (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank())) {
+                    if (cj.optString("date") == today && (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank() || cj.optString("textAr").isNotBlank())) {
                         _dailyHadith.value = DailyHadith(
                             cj.optString("textUrdu"), cj.optString("textEn"),
                             cj.optString("book"), cj.optInt("number"),
-                            cj.optString("section")
+                            cj.optString("section"), cj.optString("textAr")
                         )
                         return@launch
                     }
                 }
             } catch (_: Exception) { /* fall through to network */ }
-            // Step 2: Fetch today's hadith (Urdu + English editions).
+            // Step 2: Fetch today's hadith (Urdu + English + Arabic editions).
             val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
             val number = (dayOfYear * 17 % 7563) + 1 // Sahih al-Bukhari has 7563 hadiths
             try {
                 val urduJson = fetchUrl("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/urd-bukhari/$number.json")
                 val enJson = fetchUrl("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari/$number.json")
+                // Arabic is a translate option only — its failure must not block Urdu/English.
+                val arJson = try { fetchUrl("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/ara-bukhari/$number.json") } catch (_: Exception) { "" }
                 val urduObj = JSONObject(urduJson)
                 val enObj = JSONObject(enJson)
+                val arObj = if (arJson.isNotBlank()) JSONObject(arJson) else null
                 val urduHadith = urduObj.optJSONArray("hadiths")?.optJSONObject(0)
                 val enHadith = enObj.optJSONArray("hadiths")?.optJSONObject(0)
+                val arHadith = arObj?.optJSONArray("hadiths")?.optJSONObject(0)
                 val textUrdu = urduHadith?.optString("text") ?: ""
                 val textEn = enHadith?.optString("text") ?: ""
-                if (textUrdu.isBlank() && textEn.isBlank()) return@launch // keep current
+                val textAr = arHadith?.optString("text") ?: ""
+                if (textUrdu.isBlank() && textEn.isBlank() && textAr.isBlank()) return@launch // keep current
                 val section = urduObj.optJSONObject("metadata")?.optJSONObject("section")?.optString("1") ?: ""
-                val hadith = DailyHadith(textUrdu, textEn, "Sahih al-Bukhari", number, section)
+                val hadith = DailyHadith(textUrdu, textEn, "Sahih al-Bukhari", number, section, textAr)
                 _dailyHadith.value = hadith
                 val cj = JSONObject().apply {
                     put("date", today); put("number", number)
-                    put("textUrdu", textUrdu); put("textEn", textEn)
+                    put("textUrdu", textUrdu); put("textEn", textEn); put("textAr", textAr)
                     put("book", hadith.book); put("section", section)
                 }
                 dao.putSetting(Setting("daily_hadith", cj.toString()))
@@ -510,11 +518,11 @@ class AppViewModel(private val ctx: Context) : ViewModel() {
                     val cached = dao.setting("daily_hadith")?.value
                     if (cached != null) {
                         val cj = JSONObject(cached)
-                        if (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank()) {
+                        if (cj.optString("textUrdu").isNotBlank() || cj.optString("textEn").isNotBlank() || cj.optString("textAr").isNotBlank()) {
                             _dailyHadith.value = DailyHadith(
                                 cj.optString("textUrdu"), cj.optString("textEn"),
                                 cj.optString("book"), cj.optInt("number"),
-                                cj.optString("section")
+                                cj.optString("section"), cj.optString("textAr")
                             )
                         }
                     }

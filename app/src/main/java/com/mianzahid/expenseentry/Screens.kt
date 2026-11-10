@@ -57,26 +57,26 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    Column(Modifier.fillMaxSize().background(Bg).padding(12.dp)) {
+    Column(Modifier.fillMaxSize().background(Bg()).padding(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(vm.t("categories"), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DarkText)
-            Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("newCategory")) }
+            Text(vm.t("categories"), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DarkText())
+            Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("newCategory")) }
         }
-        Text(vm.t("permanentRecord"), fontSize = 12.sp, color = Muted)
+        Text(vm.t("permanentRecord"), fontSize = 12.sp, color = Muted())
         Spacer(Modifier.height(8.dp))
         LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
             items(categories) { c ->
                 val list = entries.filter { it.categoryId == c.id }
                 val total = list.sumOf { it.amount }
-                Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite()), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${categoryIcon(c.name)} ${vm.catName(c)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BodyText)
+                            Text("${categoryIcon(c.name)} ${vm.catName(c)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BodyText())
                             if (isAdmin) Text("🗑", modifier = Modifier.clickable { confirmDelete = c })
                         }
-                        Text(fmtRs(total), color = if (c.type == "IN") Green else Red, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("${list.size} ${vm.t("entries")} →", fontSize = 12.sp, color = Muted)
-                        Text(if (c.type == "IN") vm.t("totalReceived") else vm.t("totalExpenses"), fontSize = 11.sp, color = Muted)
+                        Text(fmtRs(total), color = if (c.type == "IN") Green() else Red(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("${list.size} ${vm.t("entries")} →", fontSize = 12.sp, color = Muted())
+                        Text(if (c.type == "IN") vm.t("totalReceived") else vm.t("totalExpenses"), fontSize = 11.sp, color = Muted())
                     }
                 }
             }
@@ -90,13 +90,13 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
                     Row { RadioButton(selected = newType == "IN", onClick = { keyboardController?.hide(); focusManager.clearFocus(); newType = "IN" }); Text(vm.t("income")); RadioButton(selected = newType == "OUT", onClick = { keyboardController?.hide(); focusManager.clearFocus(); newType = "OUT" }); Text(vm.t("expenseType")) }
                 }
             },
-            confirmButton = { Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); if (newName.isNotBlank()) { vm.addCategory(newName.trim(), newType); newName = ""; showAdd = false } }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("add")) } },
+            confirmButton = { Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); if (newName.isNotBlank()) { vm.addCategory(newName.trim(), newType); newName = ""; showAdd = false } }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("add")) } },
             dismissButton = { TextButton(onClick = { showAdd = false }) { Text(vm.t("cancel")) } })
     }
     if (confirmDelete != null) {
         AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text(vm.t("confirmDelete")) },
             text = { Text(vm.t("deleteCategoryConfirm")) },
-            confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
+            confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(vm.t("cancel")) } })
     }
 }
@@ -111,10 +111,10 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
     var showEntry by remember { mutableStateOf(false) }
     var confirmDeleteEntry by remember { mutableStateOf<Entry?>(null) }
 
-    Column(Modifier.fillMaxSize().background(Bg)) {
+    Column(Modifier.fillMaxSize().background(Bg())) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back") }
-            Text("${categoryIcon(cat.name)} ${vm.catName(cat)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.weight(1f))
+            Text("${categoryIcon(cat.name)} ${vm.catName(cat)}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText(), modifier = Modifier.weight(1f))
             ThreeDotMenu(vm)
         }
         Column(
@@ -127,21 +127,21 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
             Text("${list.size} ${vm.t("entries")} • ${if (cat.type == "IN") vm.t("totalReceived") else vm.t("totalExpenses")}", color = Color.White.copy(alpha = 0.85f))
         }
         Spacer(Modifier.height(8.dp))
-        Button(onClick = { showEntry = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text("+ ${vm.t("add")} ${vm.t("entries")}") }
+        Button(onClick = { showEntry = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text("+ ${vm.t("add")} ${vm.t("entries")}") }
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-            if (list.isEmpty()) Text(vm.t("noEntries"), color = Muted)
+            if (list.isEmpty()) Text(vm.t("noEntries"), color = Muted())
             list.forEach { e ->
-                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite()), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(if (e.type == "IN") InBg else OutBg), contentAlignment = Alignment.Center) { Text(if (e.type == "IN") "↓" else "↑", color = if (e.type == "IN") Green else Red, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(if (e.type == "IN") InBg() else OutBg()), contentAlignment = Alignment.Center) { Text(if (e.type == "IN") "↓" else "↑", color = if (e.type == "IN") Green() else Red(), fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                         Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                            Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else vm.catName(cat), fontWeight = FontWeight.Bold, color = BodyText)
-                            Text("${shortDate(e.dateMillis, vm.lang.value)} • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Muted)
-                            if (e.receiptUri.isNotEmpty()) Text("📷 ${vm.t("receiptPhoto")}", fontSize = 11.sp, color = Green)
+                            Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else vm.catName(cat), fontWeight = FontWeight.Bold, color = BodyText())
+                            Text("${shortDate(e.dateMillis, vm.lang.value)} • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Muted())
+                            if (e.receiptUri.isNotEmpty()) Text("📷 ${vm.t("receiptPhoto")}", fontSize = 11.sp, color = Green())
                         }
-                        Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), fontWeight = FontWeight.Bold, color = if (e.type == "IN") Green else Red)
-                        TextButton(onClick = { confirmDeleteEntry = e }) { Text(vm.t("delete"), color = Red, fontSize = 12.sp) }
+                        Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), fontWeight = FontWeight.Bold, color = if (e.type == "IN") Green() else Red())
+                        TextButton(onClick = { confirmDeleteEntry = e }) { Text(vm.t("delete"), color = Red(), fontSize = 12.sp) }
                     }
                 }
             }
@@ -151,7 +151,7 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
     if (confirmDeleteEntry != null) {
         AlertDialog(onDismissRequest = { confirmDeleteEntry = null }, title = { Text(vm.t("confirmDelete")) },
             text = { Text(fmtRs(confirmDeleteEntry!!.amount)) },
-            confirmButton = { Button(onClick = { vm.deleteEntry(confirmDeleteEntry!!.id); confirmDeleteEntry = null }, colors = ButtonDefaults.buttonColors(containerColor = Red), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
+            confirmButton = { Button(onClick = { vm.deleteEntry(confirmDeleteEntry!!.id); confirmDeleteEntry = null }, colors = ButtonDefaults.buttonColors(containerColor = Red()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
             dismissButton = { TextButton(onClick = { confirmDeleteEntry = null }) { Text(vm.t("cancel")) } })
     }
 }
@@ -160,10 +160,10 @@ fun CategoryDetailScreen(vm: AppViewModel, catId: Int, onBack: () -> Unit) {
 @Composable
 fun CalculatorScreen(vm: AppViewModel) {
     var tab by remember { mutableStateOf(0) } // 0 calc, 1 currency, 2 units
-    Column(Modifier.fillMaxSize().background(Bg).padding(12.dp)) {
+    Column(Modifier.fillMaxSize().background(Bg()).padding(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(vm.t("calculator"), vm.t("currency"), "Units").forEachIndexed { i, label ->
-                Button(onClick = { tab = i }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp), colors = ButtonDefaults.buttonColors(containerColor = if (tab == i) Green else CardWhite, contentColor = if (tab == i) Color.White else LabelText)) { Text(label, fontSize = 12.sp, maxLines = 1) }
+                Button(onClick = { tab = i }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp), colors = ButtonDefaults.buttonColors(containerColor = if (tab == i) Green() else CardWhite(), contentColor = if (tab == i) Color.White else LabelText())) { Text(label, fontSize = 12.sp, maxLines = 1) }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -193,15 +193,15 @@ fun ArithmeticCalc() {
         }
     }
     Column {
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
-            Text(display, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
+            Text(display, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = DarkText(), modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
         }
         Spacer(Modifier.height(8.dp))
         val keys = listOf(listOf("7","8","9","/"), listOf("4","5","6","*"), listOf("1","2","3","-"), listOf("0",".","C","+"), listOf("="))
         keys.forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { k ->
-                    Button(onClick = { press(k) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(14.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp), colors = ButtonDefaults.buttonColors(containerColor = if (k == "=") Green else Color.White, contentColor = if (k == "=") Color.White else DarkText)) { Text(k, fontSize = 20.sp) }
+                    Button(onClick = { press(k) }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(14.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp), colors = ButtonDefaults.buttonColors(containerColor = if (k == "=") Green() else CardWhite(), contentColor = if (k == "=") Color.White else DarkText())) { Text(k, fontSize = 20.sp) }
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -247,8 +247,8 @@ fun CurrencyCalc(vm: AppViewModel) {
 
     LaunchedEffect(Unit) { vm.fetchRates() }
     Column(Modifier.verticalScroll(rememberScrollState())) {
-        Text(if (live) "● ${vm.t("liveRates")}" else "○ ${vm.t("offlineRates")}", color = if (live) Green else Muted, fontSize = 12.sp)
-        if (updated.isNotEmpty()) Text("${vm.t("lastUpdated")}: $updated", fontSize = 12.sp, color = Muted)
+        Text(if (live) "● ${vm.t("liveRates")}" else "○ ${vm.t("offlineRates")}", color = if (live) Green() else Muted(), fontSize = 12.sp)
+        if (updated.isNotEmpty()) Text("${vm.t("lastUpdated")}: $updated", fontSize = 12.sp, color = Muted())
         OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CurrencyDrop(currencies, from, { from = it }, Modifier.weight(1f))
@@ -262,7 +262,7 @@ fun CurrencyCalc(vm: AppViewModel) {
         ) {
             Text("$amount $from = ${"%,.2f".format(result)} $to", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
         }
-        Button(onClick = { vm.fetchRates() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("updateRates"), fontWeight = FontWeight.Bold, maxLines = 1) }
+        Button(onClick = { vm.fetchRates() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("updateRates"), fontWeight = FontWeight.Bold, maxLines = 1) }
         OutlinedButton(onClick = { if (!editMode) editVal = (rates[editCur] ?: 0.0).toString(); editMode = !editMode }, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("editRates"), maxLines = 1) }
         if (editMode) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
@@ -322,7 +322,7 @@ fun UnitConverter(vm: AppViewModel) {
     var tempTo by remember { mutableStateOf("F") }
 
     Column {
-        Text(unitGroupLabel(vm, group), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.padding(bottom = 4.dp))
+        Text(unitGroupLabel(vm, group), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText(), modifier = Modifier.padding(bottom = 4.dp))
         UnitDrop(groups.keys.toList() + "Temperature", group, { g ->
             if (g == "Temperature") {
                 group = g
@@ -334,7 +334,7 @@ fun UnitConverter(vm: AppViewModel) {
         if (group == "Temperature") {
             OutlinedTextField(value = tempC, onValueChange = { tempC = it }, label = { Text("°C") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
             val c = tempC.toDoubleOrNull() ?: 0.0
-            Text("°F: ${"%.1f".format(c * 9 / 5 + 32)}   •   K: ${"%.1f".format(c + 273.15)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.padding(top = 8.dp))
+            Text("°F: ${"%.1f".format(c * 9 / 5 + 32)}   •   K: ${"%.1f".format(c + 273.15)}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText(), modifier = Modifier.padding(top = 8.dp))
         } else {
             OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -408,36 +408,39 @@ fun ReportScreen(vm: AppViewModel) {
         val maxV = months.maxOfOrNull { c ->
             entries.filter { e -> val ec = Calendar.getInstance().apply { timeInMillis = e.dateMillis }; ec.get(Calendar.MONTH) == c.get(Calendar.MONTH) && ec.get(Calendar.YEAR) == c.get(Calendar.YEAR) }.sumOf { it.amount }
         } ?: 1L
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
             Column(Modifier.padding(12.dp)) {
-                Text("6 ${vm.t("month")}", fontWeight = FontWeight.Bold, color = DarkText)
+                Text("6 ${vm.t("month")}", fontWeight = FontWeight.Bold, color = DarkText())
                 months.forEach { c ->
                     val mIn = entries.filter { e -> e.type == "IN" && Calendar.getInstance().apply { timeInMillis = e.dateMillis }.get(Calendar.MONTH) == c.get(Calendar.MONTH) }.sumOf { it.amount }
                     val mOut = entries.filter { e -> e.type == "OUT" && Calendar.getInstance().apply { timeInMillis = e.dateMillis }.get(Calendar.MONTH) == c.get(Calendar.MONTH) }.sumOf { it.amount }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
                         Text(Strings.get(vm.lang.value, listOf("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec")[c.get(Calendar.MONTH)]), modifier = Modifier.width(40.dp), fontSize = 12.sp)
+                        // Canvas onDraw is not a @Composable scope — read the colors first.
+                        val barGreen = Green()
+                        val barRed = Red()
                         Canvas(Modifier.weight(1f).height(14.dp)) {
                             val w = size.width
-                            drawRect(Green, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w * (mIn.toFloat() / maxV.toFloat().coerceAtLeast(1f)), 6f))
-                            drawRect(Red, topLeft = Offset(0f, 8f), size = androidx.compose.ui.geometry.Size(w * (mOut.toFloat() / maxV.toFloat().coerceAtLeast(1f)), 6f))
+                            drawRect(barGreen, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w * (mIn.toFloat() / maxV.toFloat().coerceAtLeast(1f)), 6f))
+                            drawRect(barRed, topLeft = Offset(0f, 8f), size = androidx.compose.ui.geometry.Size(w * (mOut.toFloat() / maxV.toFloat().coerceAtLeast(1f)), 6f))
                         }
                         Text(fmtRs(mOut), fontSize = 11.sp)
                     }
                 }
-                Text("■ ${vm.t("in")}  ■ ${vm.t("out")}", fontSize = 11.sp, color = Muted)
+                Text("■ ${vm.t("in")}  ■ ${vm.t("out")}", fontSize = 11.sp, color = Muted())
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(vm.t("permanentRecord"), fontWeight = FontWeight.Bold, color = DarkText)
-        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+        Text(vm.t("permanentRecord"), fontWeight = FontWeight.Bold, color = DarkText())
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
             Column(Modifier.padding(14.dp)) {
                 categories.forEachIndexed { index, c ->
                     val list = entries.filter { it.categoryId == c.id }
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(vm.catName(c), color = BodyText)
-                        Text("${list.size} • ${fmtRs(list.sumOf { it.amount })}", color = Muted)
+                        Text(vm.catName(c), color = BodyText())
+                        Text("${list.size} • ${fmtRs(list.sumOf { it.amount })}", color = Muted())
                     }
-                    if (index < categories.lastIndex) HorizontalDivider(color = DividerLight, thickness = 1.dp)
+                    if (index < categories.lastIndex) HorizontalDivider(color = DividerLight(), thickness = 1.dp)
                 }
             }
         }
@@ -458,13 +461,13 @@ fun SearchScreen(vm: AppViewModel) {
     Column {
         OutlinedTextField(value = q, onValueChange = { q = it }, label = { Text(vm.t("searchHint")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        if (q.isBlank()) Text(vm.t("searchHint"), color = Muted)
+        if (q.isBlank()) Text(vm.t("searchHint"), color = Muted())
         filtered.forEach { e ->
             val cat = categories.firstOrNull { it.id == e.categoryId }?.let { vm.catName(it) } ?: ""
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column { Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else cat, fontWeight = FontWeight.Bold, color = BodyText); Text("${shortDate(e.dateMillis, vm.lang.value)} • $cat • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Muted) }
-                    Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), color = if (e.type == "IN") Green else Red, fontWeight = FontWeight.Bold)
+                    Column { Text(if (e.note.isNotBlank()) vm.noteDisplay(e.note) else cat, fontWeight = FontWeight.Bold, color = BodyText()); Text("${shortDate(e.dateMillis, vm.lang.value)} • $cat • ${vm.memberDisplayName(e.memberName)}", fontSize = 12.sp, color = Muted()) }
+                    Text((if (e.type == "IN") "+ " else "− ") + fmtRs(e.amount), color = if (e.type == "IN") Green() else Red(), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -485,22 +488,22 @@ fun PlannedScreen(vm: AppViewModel) {
     Column {
         rec.forEach { r ->
             val cat = categories.firstOrNull { it.id == r.categoryId }?.let { vm.catName(it) } ?: ""
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column { Text(cat, fontWeight = FontWeight.Bold, color = BodyText); Text("${fmtRs(r.amount)} • ${vm.t("everyMonth")} • ${vm.t("day")} ${r.dayOfMonth}", fontSize = 12.sp, color = Muted) }
-                    TextButton(onClick = { vm.deleteRecurring(r.id) }) { Text(vm.t("delete"), color = Red) }
+                    Column { Text(cat, fontWeight = FontWeight.Bold, color = BodyText()); Text("${fmtRs(r.amount)} • ${vm.t("everyMonth")} • ${vm.t("day")} ${r.dayOfMonth}", fontSize = 12.sp, color = Muted()) }
+                    TextButton(onClick = { vm.deleteRecurring(r.id) }) { Text(vm.t("delete"), color = Red()) }
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(vm.t("add"), fontWeight = FontWeight.Bold, color = DarkText)
+        Text(vm.t("add"), fontWeight = FontWeight.Bold, color = DarkText())
         OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = day, onValueChange = { if (it.all { c -> c.isDigit() }) day = it }, label = { Text("${vm.t("date")} (1-28)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         categories.forEach { c ->
             Row(Modifier.clickable { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id }.padding(vertical = 4.dp)) { RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id }); Text(vm.catName(c)) }
         }
-        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); val a = amount.toLongOrNull() ?: 0L; val d = day.toIntOrNull() ?: 1; if (a > 0 && catId != 0) { vm.addRecurring(catId, a, note, d.coerceIn(1, 28)); amount = ""; note = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("save")) }
+        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); val a = amount.toLongOrNull() ?: 0L; val d = day.toIntOrNull() ?: 1; if (a > 0 && catId != 0) { vm.addRecurring(catId, a, note, d.coerceIn(1, 28)); amount = ""; note = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("save")) }
     }
 }
 
@@ -513,11 +516,11 @@ fun RemindersScreen(vm: AppViewModel) {
     var dateStr by remember { mutableStateOf("") }
     Column {
         rem.forEach { r ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = r.done, onCheckedChange = { vm.toggleReminder(r) })
-                    Column(Modifier.weight(1f)) { Text(r.title, fontWeight = FontWeight.Bold, color = BodyText); Text(shortDate(r.dateMillis, vm.lang.value), fontSize = 12.sp, color = Muted) }
-                    TextButton(onClick = { vm.deleteReminder(r.id) }) { Text(vm.t("delete"), color = Red) }
+                    Column(Modifier.weight(1f)) { Text(r.title, fontWeight = FontWeight.Bold, color = BodyText()); Text(shortDate(r.dateMillis, vm.lang.value), fontSize = 12.sp, color = Muted()) }
+                    TextButton(onClick = { vm.deleteReminder(r.id) }) { Text(vm.t("delete"), color = Red()) }
                 }
             }
         }
@@ -530,7 +533,7 @@ fun RemindersScreen(vm: AppViewModel) {
                 val cal = Calendar.getInstance().apply { set(parts[2], parts[1] - 1, parts[0], 9, 0, 0) }
                 vm.addReminder(title, cal.timeInMillis); title = ""; dateStr = ""
             }
-        }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("addReminder")) }
+        }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("addReminder")) }
     }
 }
 
@@ -545,14 +548,14 @@ fun BudgetScreen(vm: AppViewModel) {
     var amt by remember { mutableStateOf("") }
     var confirmDelete by remember { mutableStateOf<Category?>(null) }
     Column {
-        Text(vm.t("thisMonth"), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DarkText)
+        Text(vm.t("thisMonth"), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = DarkText())
         categories.filter { it.type == "OUT" }.forEach { c ->
             val spent = entries.filter { it.categoryId == c.id && it.type == "OUT" }.sumOf { it.amount }
             val b = budgets.firstOrNull { it.categoryId == c.id }
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Column(Modifier.padding(12.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(vm.catName(c), fontWeight = FontWeight.Bold, color = BodyText)
+                        Text(vm.catName(c), fontWeight = FontWeight.Bold, color = BodyText())
                         Row {
                             TextButton(onClick = { editing = c; amt = b?.amount?.toString() ?: "" }) { Text(vm.t("setBudget")) }
                             TextButton(onClick = { confirmDelete = c }) { Text("🗑", fontSize = 16.sp) }
@@ -561,8 +564,8 @@ fun BudgetScreen(vm: AppViewModel) {
                     Text("${vm.t("totalExpenses")}: ${fmtRs(spent)}" + (if (b != null) " / ${fmtRs(b.amount)}" else " • ${vm.t("noBudget")}"), fontSize = 13.sp)
                     if (b != null) {
                         val frac = (spent.toFloat() / b.amount.coerceAtLeast(1)).coerceIn(0f, 1f)
-                        LinearProgressIndicator(progress = frac, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), color = if (spent > b.amount) Red else if (spent > b.amount * 0.8) Color(0xFFFF9800) else Green)
-                        if (spent > b.amount) Text(vm.t("overBudget"), color = Red, fontSize = 12.sp)
+                        LinearProgressIndicator(progress = frac, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), color = if (spent > b.amount) Red() else if (spent > b.amount * 0.8) Color(0xFFFF9800) else Green())
+                        if (spent > b.amount) Text(vm.t("overBudget"), color = Red(), fontSize = 12.sp)
                         else if (spent > b.amount * 0.8) Text(vm.t("riskOverspend"), color = Color(0xFFFF9800), fontSize = 12.sp)
                     }
                 }
@@ -572,13 +575,13 @@ fun BudgetScreen(vm: AppViewModel) {
     if (editing != null) {
         AlertDialog(onDismissRequest = { editing = null }, title = { Text("${vm.t("setBudget")} — ${vm.catName(editing!!)}") },
             text = { OutlinedTextField(value = amt, onValueChange = { if (it.all { c -> c.isDigit() }) amt = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) },
-            confirmButton = { Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); amt.toLongOrNull()?.let { vm.setBudget(editing!!.id, it) }; editing = null }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("save")) } },
+            confirmButton = { Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); amt.toLongOrNull()?.let { vm.setBudget(editing!!.id, it) }; editing = null }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("save")) } },
             dismissButton = { TextButton(onClick = { editing = null }) { Text(vm.t("cancel")) } })
     }
     if (confirmDelete != null) {
         AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text(vm.t("confirmDelete")) },
             text = { Text(vm.catName(confirmDelete!!)) },
-            confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
+            confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(vm.t("cancel")) } })
     }
 }
@@ -594,15 +597,15 @@ fun LoanScreen(vm: AppViewModel) {
     val focusManager = LocalFocusManager.current
     Column {
         list.forEach { u ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(u.personName, fontWeight = FontWeight.Bold, color = BodyText)
-                        Text(if (u.kind == "lend") vm.t("toReceive") else vm.t("toReturn"), fontSize = 12.sp, color = Muted)
-                        Text(shortDate(u.dateMillis, vm.lang.value), fontSize = 12.sp, color = Muted)
+                        Text(u.personName, fontWeight = FontWeight.Bold, color = BodyText())
+                        Text(if (u.kind == "lend") vm.t("toReceive") else vm.t("toReturn"), fontSize = 12.sp, color = Muted())
+                        Text(shortDate(u.dateMillis, vm.lang.value), fontSize = 12.sp, color = Muted())
                     }
                     Text(fmtRs(u.amount), fontWeight = FontWeight.Bold)
-                    TextButton(onClick = { if (u.status == "pending") vm.markUdharPaid(u) else vm.deleteUdhar(u.id) }) { Text(if (u.status == "pending") vm.t("paid") else vm.t("delete"), color = if (u.status == "pending") Green else Red) }
+                    TextButton(onClick = { if (u.status == "pending") vm.markUdharPaid(u) else vm.deleteUdhar(u.id) }) { Text(if (u.status == "pending") vm.t("paid") else vm.t("delete"), color = if (u.status == "pending") Green() else Red()) }
                 }
             }
         }
@@ -610,7 +613,7 @@ fun LoanScreen(vm: AppViewModel) {
         OutlinedTextField(value = person, onValueChange = { person = it }, label = { Text(vm.t("person")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         Row { RadioButton(selected = kind == "lend", onClick = { keyboardController?.hide(); focusManager.clearFocus(); kind = "lend" }); Text(vm.t("toReceive")); RadioButton(selected = kind == "borrow", onClick = { keyboardController?.hide(); focusManager.clearFocus(); kind = "borrow" }); Text(vm.t("toReturn")) }
-        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); val a = amount.toLongOrNull() ?: 0L; if (person.isNotBlank() && a > 0) { vm.addUdhar(person, a, kind); person = ""; amount = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("add")) }
+        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); val a = amount.toLongOrNull() ?: 0L; if (person.isNotBlank() && a > 0) { vm.addUdhar(person, a, kind); person = ""; amount = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("add")) }
     }
 }
 
@@ -627,15 +630,15 @@ fun BillsScreen(vm: AppViewModel) {
     Column {
         list.forEach { b ->
             val overdue = b.status == "pending" && b.dueMillis < System.currentTimeMillis()
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(b.name, fontWeight = FontWeight.Bold, color = BodyText)
-                        Text("${b.provider} • ${shortDate(b.dueMillis, vm.lang.value)}", fontSize = 12.sp, color = Muted)
-                        if (overdue) Text(vm.t("overdue"), color = Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(b.name, fontWeight = FontWeight.Bold, color = BodyText())
+                        Text("${b.provider} • ${shortDate(b.dueMillis, vm.lang.value)}", fontSize = 12.sp, color = Muted())
+                        if (overdue) Text(vm.t("overdue"), color = Red(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
-                    Text(fmtRs(b.amount), fontWeight = FontWeight.Bold, color = Red)
-                    TextButton(onClick = { if (b.status == "pending") vm.markBillPaid(b) else vm.deleteBill(b.id) }) { Text(if (b.status == "pending") vm.t("paid") else vm.t("delete"), color = if (b.status == "pending") Green else Red) }
+                    Text(fmtRs(b.amount), fontWeight = FontWeight.Bold, color = Red())
+                    TextButton(onClick = { if (b.status == "pending") vm.markBillPaid(b) else vm.deleteBill(b.id) }) { Text(if (b.status == "pending") vm.t("paid") else vm.t("delete"), color = if (b.status == "pending") Green() else Red()) }
                 }
             }
         }
@@ -653,7 +656,7 @@ fun BillsScreen(vm: AppViewModel) {
                 val cal = Calendar.getInstance().apply { set(parts[2], parts[1] - 1, parts[0], 23, 59, 0) }
                 vm.addBill(name, provider, a, cal.timeInMillis); name = ""; amount = ""; due = ""
             }
-        }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("add")) }
+        }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("add")) }
     }
 }
 
@@ -670,19 +673,19 @@ fun FamilyScreen(vm: AppViewModel) {
     var lastCode by remember { mutableStateOf("") }
     val ctx = LocalContext.current
     Column {
-        Text(vm.t("family"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText)
+        Text(vm.t("family"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText())
         members.forEach { m ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), colors = CardDefaults.cardColors(containerColor = CardWhite())) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(m.name, fontWeight = FontWeight.Bold, color = BodyText)
-                    if (isAdmin) TextButton(onClick = { vm.deleteMember(m.id) }) { Text(vm.t("delete"), color = Red) }
+                    Text(m.name, fontWeight = FontWeight.Bold, color = BodyText())
+                    if (isAdmin) TextButton(onClick = { vm.deleteMember(m.id) }) { Text(vm.t("delete"), color = Red()) }
                 }
             }
         }
-        if (members.isEmpty()) Text(vm.t("noMembers"), color = Muted)
+        if (members.isEmpty()) Text(vm.t("noMembers"), color = Muted())
         Spacer(Modifier.height(8.dp))
         if (isAdmin) {
-            Button(onClick = { lastCode = vm.createInvite() }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("createInvite")) }
+            Button(onClick = { lastCode = vm.createInvite() }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("createInvite")) }
             if (lastCode.isNotEmpty()) {
                 Column(
                     Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(24.dp))
@@ -703,17 +706,17 @@ fun FamilyScreen(vm: AppViewModel) {
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text(vm.t("addMember"), fontWeight = FontWeight.Bold, color = DarkText)
+            Text(vm.t("addMember"), fontWeight = FontWeight.Bold, color = DarkText())
             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(vm.t("yourName")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = pin, onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pin = it }, label = { Text(vm.t("setPin")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
-            Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); if (name.isNotBlank() && pin.length >= 4) { vm.addMember(name, pin); name = ""; pin = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("add")) }
+            Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); if (name.isNotBlank() && pin.length >= 4) { vm.addMember(name, pin); name = ""; pin = "" } }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("add")) }
             Spacer(Modifier.height(8.dp))
             invites.forEach { inv ->
                 val expired = System.currentTimeMillis() > inv.expiresAt
                 val status = when { inv.status == "revoked" -> vm.t("revoked"); inv.status == "used" -> "${vm.t("used")} (${inv.usedBy})"; expired -> vm.t("expired"); else -> vm.t("waiting") }
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("${inv.code} • $status", fontSize = 13.sp)
-                    if (inv.status == "active" && !expired) TextButton(onClick = { vm.revokeInvite(inv.id) }) { Text(vm.t("revoke"), color = Red) }
+                    if (inv.status == "active" && !expired) TextButton(onClick = { vm.revokeInvite(inv.id) }) { Text(vm.t("revoke"), color = Red()) }
                 }
             }
         }
@@ -734,10 +737,10 @@ fun BackupScreen(vm: AppViewModel) {
         }
     }
     Column {
-        Text(vm.t("backup"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText)
-        Text("${vm.t("lastBackup")}: ${if (lastBackup.isEmpty()) vm.t("never") else lastBackup}", color = Muted)
+        Text(vm.t("backup"), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText())
+        Text("${vm.t("lastBackup")}: ${if (lastBackup.isEmpty()) vm.t("never") else lastBackup}", color = Muted())
         Spacer(Modifier.height(8.dp))
-        Button(onClick = { msg = if (vm.saveServerBackup()) vm.t("backupSaved") else "Backup failed" }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("backupNow")) }
+        Button(onClick = { msg = if (vm.saveServerBackup()) vm.t("backupSaved") else "Backup failed" }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("backupNow")) }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = {
             val json = vm.buildBackupJson()
@@ -750,7 +753,7 @@ fun BackupScreen(vm: AppViewModel) {
         Button(onClick = {
             val json = vm.loadSavedBackupJson()
             msg = if (json != null && vm.restoreFromJson(json)) "✓ ${vm.t("restore")}" else "No saved backup"
-        }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("restoreSaved")) }
+        }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("restoreSaved")) }
         OutlinedButton(onClick = { pickFile.launch("application/json") }, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) { Text(vm.t("restoreFile")) }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = {
@@ -779,9 +782,9 @@ fun BackupScreen(vm: AppViewModel) {
             ctx.startActivity(Intent.createChooser(intent, vm.t("exportPdf")))
         }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text(vm.t("exportPdf")) }
         Spacer(Modifier.height(8.dp))
-        Text(vm.t("gmailBackup"), fontWeight = FontWeight.Bold, color = DarkText)
-        Text(vm.t("gmailNote"), fontSize = 12.sp, color = Muted)
-        if (msg.isNotEmpty()) Text(msg, color = Green, modifier = Modifier.padding(top = 8.dp))
+        Text(vm.t("gmailBackup"), fontWeight = FontWeight.Bold, color = DarkText())
+        Text(vm.t("gmailNote"), fontSize = 12.sp, color = Muted())
+        if (msg.isNotEmpty()) Text(msg, color = Green(), modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -795,7 +798,7 @@ fun ChangePinScreen(vm: AppViewModel) {
     Column {
         OutlinedTextField(value = old, onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) old = it }, label = { Text(vm.t("oldPin")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = newPin, onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) newPin = it }, label = { Text(vm.t("newPin")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
-        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); msg = if (vm.changeAdminPin(old, newPin)) "✓ PIN changed" else vm.t("wrongPin") }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("save")) }
+        Button(onClick = { keyboardController?.hide(); focusManager.clearFocus(); msg = if (vm.changeAdminPin(old, newPin)) "✓ PIN changed" else vm.t("wrongPin") }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("save")) }
         if (msg.isNotEmpty()) Text(msg, modifier = Modifier.padding(top = 8.dp))
     }
 }

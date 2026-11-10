@@ -3,6 +3,7 @@
 package com.mianzahid.expenseentry
 
 import android.app.Activity
+import android.view.inputmethod.InputMethodManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -32,6 +33,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -50,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
@@ -67,25 +71,50 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.Calendar
 
-val Green = Color(0xFF0B5E40)
-val GreenLight = Color(0xFF147A55)
-val Red = Color(0xFFC81E3A)
-val Bg = Color(0xFFF2F2F0)
-val CardWhite = Color.White
+// Theme switch: true when the user picked Dark (or Auto + system dark).
+// Provided in setContent; every color token below reads it, so the whole
+// app re-themes when it changes. Dark mode was broken because these were
+// fixed light vals and MaterialTheme always used lightColorScheme.
+val LocalIsDark = staticCompositionLocalOf { false }
+
+@Composable fun Green(): Color = if (LocalIsDark.current) Color(0xFF4CAF7D) else Color(0xFF0B5E40)
+@Composable fun GreenLight(): Color = if (LocalIsDark.current) Color(0xFF2FA37C) else Color(0xFF147A55)
+@Composable fun Red(): Color = if (LocalIsDark.current) Color(0xFFE85D75) else Color(0xFFC81E3A)
+@Composable fun Bg(): Color = if (LocalIsDark.current) Color(0xFF121A16) else Color(0xFFF2F2F0)
+@Composable fun CardWhite(): Color = if (LocalIsDark.current) Color(0xFF1E2A24) else Color.White
 // Premium design tokens (shared by all screens).
-val DarkText = Color(0xFF20382E)
-val TitleGreen = Color(0xFF173B2E)
-val Muted = Color(0xFF7C8D84)
-val BodyText = Color(0xFF263A31)
-val LabelText = Color(0xFF43534B)
-val AccentGreen = Color(0xFF087653)
-val Orange = Color(0xFFD66A36)
-val OrangeBg = Color(0xFFFFF1E8)
-val GreenTint = Color(0xFFE3F2EA)
-val InBg = Color(0xFFE8F5EE)
-val OutBg = Color(0xFFFFEEF0)
-val IconBg = Color(0xFFF0F6F2)
-val DividerLight = Color(0xFFF0F2F0)
+@Composable fun DarkText(): Color = if (LocalIsDark.current) Color(0xFFE8F0EB) else Color(0xFF20382E)
+@Composable fun TitleGreen(): Color = if (LocalIsDark.current) Color(0xFFBFE3D2) else Color(0xFF173B2E)
+@Composable fun Muted(): Color = if (LocalIsDark.current) Color(0xFF9DB3A8) else Color(0xFF7C8D84)
+@Composable fun BodyText(): Color = if (LocalIsDark.current) Color(0xFFDCE8DF) else Color(0xFF263A31)
+@Composable fun LabelText(): Color = if (LocalIsDark.current) Color(0xFFB9C9BF) else Color(0xFF43534B)
+@Composable fun AccentGreen(): Color = if (LocalIsDark.current) Color(0xFF2FA37C) else Color(0xFF087653)
+@Composable fun Orange(): Color = if (LocalIsDark.current) Color(0xFFE08A5A) else Color(0xFFD66A36)
+@Composable fun OrangeBg(): Color = if (LocalIsDark.current) Color(0xFF3A2A1E) else Color(0xFFFFF1E8)
+@Composable fun GreenTint(): Color = if (LocalIsDark.current) Color(0xFF1F3A2C) else Color(0xFFE3F2EA)
+@Composable fun InBg(): Color = if (LocalIsDark.current) Color(0xFF1F3A2C) else Color(0xFFE8F5EE)
+@Composable fun OutBg(): Color = if (LocalIsDark.current) Color(0xFF3A2226) else Color(0xFFFFEEF0)
+@Composable fun IconBg(): Color = if (LocalIsDark.current) Color(0xFF22332A) else Color(0xFFF0F6F2)
+@Composable fun DividerLight(): Color = if (LocalIsDark.current) Color(0xFF2A3A31) else Color(0xFFF0F2F0)
+// App background (Home screen) — light grey-green, dark charcoal-green.
+@Composable fun AppBg(): Color = if (LocalIsDark.current) Color(0xFF121A16) else Color(0xFFF4F7F5)
+
+// Reliable keyboard hide: Compose hide() + clearFocus() + InputMethodManager.
+// The IMM call is the one that actually dismisses the keyboard inside an
+// AlertDialog, where Compose's controller can be a no-op (keyboard stuck
+// after tapping a category radio). Owner rule: tapping ANYWHERE outside a
+// text field dismisses the keyboard; only tapping INTO a field keeps it open.
+fun hideKeyboard(ctx: android.content.Context) {
+    val imm = ctx.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    var c: android.content.Context? = ctx
+    var activity: Activity? = null
+    while (c != null) {
+        if (c is Activity) { activity = c; break }
+        c = if (c is android.content.ContextWrapper) c.baseContext else null
+    }
+    val view = activity?.currentFocus ?: activity?.window?.decorView
+    if (view != null) imm?.hideSoftInputFromWindow(view.windowToken, 0)
+}
 
 // Jameel Noori Nastaliq for Urdu text (bundled in res/font).
 val UrduFontFamily = FontFamily(Font(R.font.jameel_noori_nastaleeq))
@@ -203,18 +232,26 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
+            // Dark mode: "dark" forces dark, "light" forces light, "auto" follows the system.
+            // Persisted in SharedPreferences by vm.setTheme; read on launch.
+            val themeMode by vm.theme.collectAsState()
+            val isDark = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+            // Tap-outside-to-dismiss for every screen (empty space only;
+            // buttons/fields still get their own taps).
+            val focusManager = LocalFocusManager.current
+            val keyboardController = LocalSoftwareKeyboardController.current
+            CompositionLocalProvider(LocalIsDark provides isDark) {
             MaterialTheme(
-                colorScheme = lightColorScheme(primary = Green, secondary = GreenLight),
+                colorScheme = if (isDark) darkColorScheme(primary = Color(0xFF4CAF7D), secondary = Color(0xFF2FA37C)) else lightColorScheme(primary = Color(0xFF0B5E40), secondary = Color(0xFF147A55)),
                 typography = if (lang == "ur") urduTypography() else Typography()
             ) {
                 if (!unlocked) {
                     LockScreen(vm = vm)
                 } else {
-                    val isDark = when (vm.theme.collectAsState().value) {
-                        "dark" -> true
-                        "light" -> false
-                        else -> false
-                    }
                     BackHandler {
                         if (screen !is Screen.Home || backStack.isNotEmpty()) {
                             back()
@@ -229,7 +266,16 @@ class MainActivity : FragmentActivity() {
                             }
                         }
                     ) { pad ->
-                        Box(Modifier.padding(pad)) {
+                        // Tap anywhere outside a text field dismisses the keyboard
+                        // (empty space on any screen). Fields/buttons keep their taps.
+                        Box(
+                            Modifier.padding(pad)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onTap = {
+                                        keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
+                                    })
+                                }
+                        ) {
                             AnimatedContent(
                                 targetState = screen,
                                 transitionSpec = {
@@ -267,6 +313,7 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                 }
+            }
             }
         }
     }
@@ -321,7 +368,7 @@ class MainActivity : FragmentActivity() {
 
 @Composable
 fun BottomNav(vm: AppViewModel, current: Screen, onPick: (Screen) -> Unit) {
-    Surface(color = Color.White, shadowElevation = 4.dp) {
+    Surface(color = CardWhite(), shadowElevation = 4.dp) {
         Row(
             Modifier.fillMaxWidth().height(72.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -341,16 +388,16 @@ fun BottomNavItem(label: String, icon: String, selected: Boolean, onClick: () ->
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(icon, fontSize = 24.sp)
-        Text(label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Green else Color.Gray)
+        Text(label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Green() else Muted())
     }
 }
 
 @Composable
 fun SubPage(vm: AppViewModel, title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().background(Bg)) {
+    Column(Modifier.fillMaxSize().background(Bg())) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back") }
-            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText(), modifier = Modifier.weight(1f))
             ThreeDotMenu(vm)
         }
         Box(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
@@ -370,8 +417,8 @@ fun ThreeDotMenu(vm: AppViewModel) {
     Box {
         IconButton(
             onClick = { expanded = true },
-            modifier = Modifier.clip(CircleShape).background(Green.copy(alpha = 0.12f))
-        ) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = Green) }
+            modifier = Modifier.clip(CircleShape).background(Green().copy(alpha = 0.12f))
+        ) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = Green()) }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -407,7 +454,7 @@ fun ThreeDotMenu(vm: AppViewModel) {
                             }
                         )
                     }
-                    Divider(color = Green.copy(alpha = 0.15f))
+                    Divider(color = Green().copy(alpha = 0.15f))
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -461,8 +508,8 @@ fun ThreeDotMenu(vm: AppViewModel) {
                         },
                         onClick = { expanded = false; vm.lock() }
                     )
-                    Divider(color = Green.copy(alpha = 0.15f))
-                    DropdownMenuItem(text = { Text(vm.t("madeBy"), fontSize = 12.sp, color = Color.Gray) }, onClick = {})
+                    Divider(color = Green().copy(alpha = 0.15f))
+                    DropdownMenuItem(text = { Text(vm.t("madeBy"), fontSize = 12.sp, color = Muted()) }, onClick = {})
                 }
             }
         }
@@ -526,12 +573,12 @@ fun LockScreen(vm: AppViewModel) {
     }
 
     Column(
-        Modifier.fillMaxSize().background(Bg).padding(24.dp),
+        Modifier.fillMaxSize().background(Bg()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text("💰", fontSize = 56.sp)
-        Text(vm.t("appName"), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Green)
+        Text(vm.t("appName"), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Green())
         Spacer(Modifier.height(24.dp))
         if (joinMode) {
             OutlinedTextField(value = code, onValueChange = { code = it.uppercase() }, label = { Text(vm.t("enterCode")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
@@ -540,29 +587,29 @@ fun LockScreen(vm: AppViewModel) {
             Spacer(Modifier.height(8.dp))
             Button(onClick = { keyboardController?.hide(); focusManager.clearFocus()
                 if (vm.joinWithInvite(code, joinName, joinPin)) joinMsg = "✓ Joined" else joinMsg = vm.t("wrongPin")
-            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("join")) }
-            if (joinMsg.isNotEmpty()) Text(joinMsg, color = Green)
+            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("join")) }
+            if (joinMsg.isNotEmpty()) Text(joinMsg, color = Green())
             TextButton(onClick = { joinMode = false }) { Text(vm.t("cancel")) }
         } else if (settingUp) {
-            Text(vm.t("setPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
+            Text(vm.t("setPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText())
             var phase by remember { mutableStateOf(0) } // 0 = new PIN, 1 = confirm
             if (phase == 0) {
                 PinDots(pin)
                 NumberPad(onDigit = { if (pin.length < 6) pin += it }, onDelete = { pin = pin.dropLast(1) })
                 if (pin.length >= 4) {
-                    Button(onClick = { phase = 1 }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("confirmPin")) }
+                    Button(onClick = { phase = 1 }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("confirmPin")) }
                 }
             } else {
-                Text(vm.t("confirmPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                Text(vm.t("confirmPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText())
                 PinDots(confirm)
                 NumberPad(onDigit = { if (confirm.length < 6) { confirm += it; if (confirm.length == pin.length) { if (confirm == pin) { vm.setAdminPin(pin); vm.unlockAsAdmin() } else { error = vm.t("pinMismatch"); pin = ""; confirm = ""; phase = 0 } } } }, onDelete = { confirm = confirm.dropLast(1) })
                 TextButton(onClick = { phase = 0; pin = ""; confirm = "" }) { Text(vm.t("cancel")) }
             }
-            if (error.isNotEmpty()) Text(error, color = Red)
+            if (error.isNotEmpty()) Text(error, color = Red())
         } else {
-            Text(vm.t("enterPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
+            Text(vm.t("enterPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText())
             PinDots(pin)
-            if (error.isNotEmpty()) Text(error, color = Red)
+            if (error.isNotEmpty()) Text(error, color = Red())
             NumberPad(onDigit = { if (pin.length < 6) { pin += it; tryUnlock(pin) } }, onDelete = { pin = pin.dropLast(1); error = "" })
             Spacer(Modifier.height(12.dp))
             if (fpEnabled) {
@@ -571,7 +618,7 @@ fun LockScreen(vm: AppViewModel) {
             TextButton(onClick = { joinMode = true }) { Text(vm.t("joinWithCode")) }
             Row {
                 listOf("en" to "English", "ur" to "اردو", "roman" to "Roman Urdu").forEach { (l, label) ->
-                    TextButton(onClick = { vm.setLang(l) }) { Text(label, color = if (lang == l) Green else Color.Gray) }
+                    TextButton(onClick = { vm.setLang(l) }) { Text(label, color = if (lang == l) Green() else Muted()) }
                 }
             }
         }
@@ -584,7 +631,7 @@ fun PinDots(pin: String) {
         repeat(6) { i ->
             Box(
                 Modifier.size(16.dp).clip(CircleShape)
-                    .background(if (i < pin.length) Green else Color.LightGray)
+                    .background(if (i < pin.length) Green() else Color.LightGray)
             )
         }
     }
@@ -596,15 +643,15 @@ fun NumberPad(onDigit: (String) -> Unit, onDelete: () -> Unit) {
         listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9")).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { d ->
-                    Button(onClick = { onDigit(d) }, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) { Text(d, fontSize = 22.sp) }
+                    Button(onClick = { onDigit(d) }, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = CardWhite(), contentColor = DarkText())) { Text(d, fontSize = 22.sp) }
                 }
             }
             Spacer(Modifier.height(8.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Spacer(Modifier.size(64.dp))
-            Button(onClick = { onDigit("0") }, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) { Text("0", fontSize = 22.sp) }
-            Button(onClick = onDelete, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)) { Text("⌫", fontSize = 20.sp) }
+            Button(onClick = { onDigit("0") }, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = CardWhite(), contentColor = DarkText())) { Text("0", fontSize = 22.sp) }
+            Button(onClick = onDelete, modifier = Modifier.size(64.dp), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = CardWhite(), contentColor = DarkText())) { Text("⌫", fontSize = 20.sp) }
         }
     }
 }
@@ -630,7 +677,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     val recentEntries = entries.sortedByDescending { it.dateMillis }.take(4)
 
     Column(
-        Modifier.fillMaxSize().background(Color(0xFFF4F7F5))
+        Modifier.fillMaxSize().background(AppBg())
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         // App bar
@@ -643,12 +690,12 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                     vm.t("appName"),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF173B2E)
+                    color = TitleGreen()
                 )
                 Text(
                     fullDate(System.currentTimeMillis(), lang),
                     fontSize = 10.sp,
-                    color = Color(0xFF7C8D84)
+                    color = Muted()
                 )
             }
             Text(
@@ -657,7 +704,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF087653),
                 modifier = Modifier.clip(RoundedCornerShape(50))
-                    .background(Color(0xFFE3F2EA))
+                    .background(GreenTint())
                     .padding(horizontal = 10.dp, vertical = 7.dp)
             )
             Spacer(Modifier.width(6.dp))
@@ -736,12 +783,15 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                 }
             }
 
+            // Daily Hadith — right below the balance card, always visible
+            DailyHadithCard(vm, hadith)
+
             // Highest spending category
             if (topCat != null && topCat.second > 0) {
                 Card(
                     Modifier.fillMaxWidth().clickable { onGo(Screen.CategoryDetail(topCat.first.id)) },
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardWhite),
+                    colors = CardDefaults.cardColors(containerColor = CardWhite()),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Row(
@@ -750,19 +800,19 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                     ) {
                         Box(
                             Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFFFFF1E8)),
+                                .background(OrangeBg()),
                             contentAlignment = Alignment.Center
                         ) { Text("↗", color = Color(0xFFD66A36), fontSize = 23.sp, fontWeight = FontWeight.Bold) }
                         Column(Modifier.weight(1f).padding(start = 11.dp)) {
                             Text(vm.t("topExpense"), fontSize = 10.sp, color = Color(0xFF839087))
-                            Text(vm.catName(topCat.first), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E), maxLines = 1)
+                            Text(vm.catName(topCat.first), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DarkText(), maxLines = 1)
                             Text(
                                 "${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}",
                                 fontSize = 10.sp,
-                                color = Color.Gray
+                                color = Muted()
                             )
                         }
-                        Text(fmtRs(topCat.second), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Red)
+                        Text(fmtRs(topCat.second), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Red())
                         Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.LightGray)
                     }
                 }
@@ -774,7 +824,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                     vm.t("categories"),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF20382E)
+                    color = DarkText()
                 )
                 listOf(0 to 2, 3 to 5).forEach { (a, b) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -783,7 +833,7 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                             Column(
                                 Modifier.weight(1f).height(88.dp)
                                     .clip(RoundedCornerShape(17.dp))
-                                    .background(CardWhite)
+                                    .background(CardWhite())
                                     .combinedClickable(
                                         onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
                                         onLongClick = { showShortcutPicker = i }
@@ -792,21 +842,21 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Box(
-                                    Modifier.size(38.dp).clip(RoundedCornerShape(13.dp))
-                                        .background(Color(0xFFF0F6F2)),
+                                    Modifier.size(50.dp).clip(RoundedCornerShape(15.dp))
+                                        .background(IconBg()),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         if (key.isBlank()) "+" else shortcutIcon(key, categories),
-                                        fontSize = if (key.isBlank()) 23.sp else 19.sp,
-                                        color = Green
+                                        fontSize = if (key.isBlank()) 30.sp else 26.sp,
+                                        color = Green()
                                     )
                                 }
                                 Spacer(Modifier.height(5.dp))
                                 Text(
                                     if (key.isBlank()) vm.t("addShortcut") else shortcutLabel(vm, key),
                                     fontSize = 9.sp,
-                                    color = Color(0xFF43534B),
+                                    color = LabelText(),
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     fontWeight = FontWeight.Medium
@@ -821,16 +871,16 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
             if (recentEntries.isNotEmpty()) {
                 Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                        .background(CardWhite).padding(14.dp),
+                        .background(CardWhite()).padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(vm.t("entries"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E))
+                        Text(vm.t("entries"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DarkText())
                         Spacer(Modifier.weight(1f))
                         Text(
                             vm.t("categories"),
                             fontSize = 10.sp,
-                            color = Green,
+                            color = Green(),
                             modifier = Modifier.clickable { onGo(Screen.Categories) }
                         )
                     }
@@ -839,12 +889,12 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier.size(36.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(if (entry.type == "IN") Color(0xFFE8F5EE) else Color(0xFFFFEEF0)),
+                                    .background(if (entry.type == "IN") InBg() else OutBg()),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     if (entry.type == "IN") "↓" else "↑",
-                                    color = if (entry.type == "IN") Green else Red,
+                                    color = if (entry.type == "IN") Green() else Red(),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -854,14 +904,14 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                                     if (entry.note.isNotBlank()) vm.noteDisplay(entry.note)
                                     else category?.let { vm.catName(it) } ?: vm.t("entries"),
                                     fontSize = 12.sp,
-                                    color = Color(0xFF263A31),
+                                    color = BodyText(),
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
                                 )
                                 Text(
                                     "${shortDate(entry.dateMillis, lang)} • ${vm.memberDisplayName(entry.memberName)}",
                                     fontSize = 10.sp,
-                                    color = Color.Gray,
+                                    color = Muted(),
                                     maxLines = 1
                                 )
                             }
@@ -869,20 +919,16 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                                 (if (entry.type == "IN") "+ " else "− ") + fmtRs(entry.amount),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (entry.type == "IN") Green else Red,
+                                color = if (entry.type == "IN") Green() else Red(),
                                 maxLines = 1
                             )
                         }
                         if (index < recentEntries.lastIndex) {
-                            HorizontalDivider(color = Color(0xFFF0F2F0), thickness = 1.dp)
+                            HorizontalDivider(color = DividerLight(), thickness = 1.dp)
                         }
                     }
                 }
             }
-
-            // Daily Hadith preserved below the financial overview
-            DailyHadithCard(vm, hadith)
-            Spacer(Modifier.height(4.dp))
         }
 
         Spacer(Modifier.height(10.dp))
@@ -942,10 +988,18 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
 // English text otherwise; reference (book + hadith number) always shown.
 @Composable
 fun DailyHadithCard(vm: AppViewModel, hadith: DailyHadith) {
+    // Hadith is ALWAYS Urdu by default, whatever the app language is.
+    // Small chips switch the text to English or Arabic (max 3 languages total).
+    var hadithLang by remember { mutableStateOf("ur") }
     val lang by vm.lang.collectAsState()
-    val isUrdu = lang == "ur"
-    val text = if (isUrdu) hadith.textUrdu.ifBlank { hadith.textEn } else hadith.textEn.ifBlank { hadith.textUrdu }
-    val ref = if (isUrdu) {
+    val isUrduUi = lang == "ur"
+    val text = when (hadithLang) {
+        "ar" -> hadith.textAr.ifBlank { hadith.textUrdu.ifBlank { hadith.textEn } }
+        "en" -> hadith.textEn.ifBlank { hadith.textUrdu.ifBlank { hadith.textAr } }
+        else -> hadith.textUrdu.ifBlank { hadith.textEn.ifBlank { hadith.textAr } }
+    }
+    val isRtl = hadithLang != "en"
+    val ref = if (isUrduUi) {
         "${vm.t("bukhari")} — ${vm.t("hadith")} ${hadith.number}"
     } else {
         val section = if (hadith.section.isNotBlank()) " · ${hadith.section}" else ""
@@ -959,26 +1013,47 @@ fun DailyHadithCard(vm: AppViewModel, hadith: DailyHadith) {
         Card(
             Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2EA))
+            colors = CardDefaults.cardColors(containerColor = GreenTint())
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("📖", fontSize = 14.sp)
                     Spacer(Modifier.width(6.dp))
-                    Text(vm.t("dailyHadith"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green)
+                    Text(vm.t("dailyHadith"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green())
+                    Spacer(Modifier.weight(1f))
+                    // Translate chips: Urdu (default) / English / Arabic
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf("ur" to "اردو", "en" to "English", "ar" to "العربية").forEach { (code, label) ->
+                            val selected = hadithLang == code
+                            Box(
+                                Modifier.clip(RoundedCornerShape(10.dp))
+                                    .background(if (selected) Green() else CardWhite().copy(alpha = 0.7f))
+                                    .clickable { hadithLang = code }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) Color.White else LabelText()
+                                )
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text,
-                    fontSize = if (isUrdu) 17.sp else 14.sp,
-                    fontFamily = if (isUrdu) UrduFontFamily else null,
+                    fontSize = if (isRtl) 17.sp else 14.sp,
+                    fontFamily = if (isRtl) UrduFontFamily else null,
                     color = Color(0xFF1B5E20),
-                    textAlign = if (isUrdu) TextAlign.End else TextAlign.Start,
-                    lineHeight = if (isUrdu) 32.sp else 20.sp,
+                    textAlign = if (isRtl) TextAlign.End else TextAlign.Start,
+                    lineHeight = if (isRtl) 32.sp else 20.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(ref, fontSize = 11.sp, color = Green, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                Text(ref, fontSize = 11.sp, color = Green(), fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -1052,29 +1127,38 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
     }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense"), color = DarkText) },
+        title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense"), color = DarkText()) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+            // Tap anywhere outside a text field dismisses the keyboard
+            // (the sheet's empty space). Tapping INTO a field keeps it open.
+            Column(
+                Modifier.verticalScroll(rememberScrollState())
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
+                        })
+                    }
+            ) {
+                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 if (categoryId == null) {
-                    Text(vm.t("category"), fontWeight = FontWeight.Bold, color = DarkText, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text(vm.t("category"), fontWeight = FontWeight.Bold, color = DarkText(), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
                     categories.filter { it.type == type }.forEach { c ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id })
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); catId = c.id })
                             Text(c.name)
                         }
                     }
                 }
                 if (isAdmin && members.isNotEmpty()) {
-                    Text(vm.t("memberName"), fontWeight = FontWeight.Bold, color = DarkText, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
-                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); memberId = 0 }.padding(vertical = 4.dp)) {
-                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); focusManager.clearFocus(); memberId = 0 }); Text(vm.t("admin"))
+                    Text(vm.t("memberName"), fontWeight = FontWeight.Bold, color = DarkText(), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = 0 }.padding(vertical = 4.dp)) {
+                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = 0 }); Text(vm.t("admin"))
                     }
                     members.forEach { m ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); memberId = m.id }.padding(vertical = 4.dp)) {
-                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); memberId = m.id }); Text(m.name)
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = m.id }.padding(vertical = 4.dp)) {
+                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = m.id }); Text(m.name)
                         }
                     }
                 }
@@ -1088,19 +1172,19 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
                         try { speech.launch(intent) } catch (e: Exception) { vm.showToast(vm.t("voiceNotSupported")) }
                     }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("🎤 ${vm.t("voiceEntry")}", maxLines = 1) }
                 }
-                if (receiptUri.isNotEmpty()) Text("✓ ${vm.t("receiptPhoto")}", color = Green, fontSize = 12.sp)
+                if (receiptUri.isNotEmpty()) Text("✓ ${vm.t("receiptPhoto")}", color = Green(), fontSize = 12.sp)
             }
         },
         confirmButton = {
             Button(onClick = {
-                keyboardController?.hide(); focusManager.clearFocus()
+                keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
                 val amt = amount.toLongOrNull() ?: 0L
                 if (amt > 0 && catId != 0) {
                     val mName = if (memberId == 0) "Admin" else members.firstOrNull { it.id == memberId }?.name ?: "Admin"
                     vm.addEntry(catId, amt, note, System.currentTimeMillis(), memberId, mName, receiptUri)
                     onClose()
                 }
-            }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("save")) }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("save")) }
         },
         dismissButton = { TextButton(onClick = onClose) { Text(vm.t("cancel")) } }
     )
