@@ -638,6 +638,12 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     NavBus.go = onGo
     val lang by vm.lang.collectAsState()
     val dash = vm.dashboard()
+    // Current date for the balance card (top-right): weekday + DD-FullMonth-YY,
+    // both lines same size, centered. English names (owner's format).
+    // Computed fresh on every composition so it updates daily.
+    val todayCal = java.util.Calendar.getInstance()
+    val todayWeekday = java.text.SimpleDateFormat("EEEE", java.util.Locale.ENGLISH).format(todayCal.time)
+    val todayDate = java.text.SimpleDateFormat("dd-MMMM-yy", java.util.Locale.ENGLISH).format(todayCal.time)
     val entries by vm.entries.collectAsState()
     val categories by vm.categories.collectAsState()
     val shortcuts by vm.shortcuts.collectAsState()
@@ -714,20 +720,30 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.7.sp
                     )
-                    Text(
-                        "CASH",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.clip(RoundedCornerShape(50))
                             .background(Color.White.copy(alpha = 0.15f))
                             .padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
+                    ) {
+                        Text(
+                            todayWeekday,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            todayDate,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 Spacer(Modifier.height(9.dp))
                 Text(
                     fmtRs(dash.balance),
-                    color = Color.White,
+                    color = if (dash.balance < 0) Red() else Color.White,
                     fontSize = 34.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.5).sp
