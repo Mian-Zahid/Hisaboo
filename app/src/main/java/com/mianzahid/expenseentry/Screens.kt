@@ -234,7 +234,7 @@ fun CurrencyCalc(vm: AppViewModel) {
     val updated by vm.ratesUpdated.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    var amount by remember { mutableStateOf("1000") }
+    var amount by remember { mutableStateOf("") }
     var from by remember { mutableStateOf("USD") }
     var to by remember { mutableStateOf("PKR") }
     var editMode by remember { mutableStateOf(false) }
@@ -260,7 +260,7 @@ fun CurrencyCalc(vm: AppViewModel) {
                 .background(Brush.linearGradient(listOf(Color(0xFF087653), Color(0xFF004D38))))
                 .padding(18.dp)
         ) {
-            Text("$amount $from = ${"%,.2f".format(result)} $to", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Text("$amount $from = ${"%,.2f".format(result)} $to", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
         }
         Button(onClick = { vm.fetchRates() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("updateRates"), fontWeight = FontWeight.Bold, maxLines = 1) }
         OutlinedButton(onClick = { if (!editMode) editVal = (rates[editCur] ?: 0.0).toString(); editMode = !editMode }, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text(vm.t("editRates"), maxLines = 1) }
@@ -307,7 +307,7 @@ fun UnitConverter(vm: AppViewModel) {
         "Fuel" to listOf("km/L" to 1.0, "L/100km" to 1.0, "mpg" to 0.425144)
     )
     var group by remember { mutableStateOf("Length") }
-    var amount by remember { mutableStateOf("1") }
+    var amount by remember { mutableStateOf("") }
     var from by remember { mutableStateOf(groups["Length"]!![0].first) }
     var to by remember { mutableStateOf(groups["Length"]!![1].first) }
     val units = groups[group] ?: emptyList()
@@ -347,7 +347,7 @@ fun UnitConverter(vm: AppViewModel) {
                     .background(Brush.linearGradient(listOf(Color(0xFF087653), Color(0xFF004D38))))
                     .padding(18.dp)
             ) {
-                Text("$amount $from = ${"%.4f".format(result)} $to", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Text("$amount $from = ${"%.4f".format(result)} $to", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
     }

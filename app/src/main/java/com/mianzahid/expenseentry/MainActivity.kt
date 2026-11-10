@@ -34,7 +34,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -56,6 +55,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -71,49 +71,53 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.Calendar
 
-// Theme switch: true when the user picked Dark (or Auto + system dark).
-// Provided in setContent; every color token below reads it, so the whole
-// app re-themes when it changes. Dark mode was broken because these were
-// fixed light vals and MaterialTheme always used lightColorScheme.
-val LocalIsDark = staticCompositionLocalOf { false }
+// Light-only color tokens (shared by all screens). Dark mode was removed
+// entirely (owner, Nov 10) — no theme setting anywhere in the app.
 
-@Composable fun Green(): Color = if (LocalIsDark.current) Color(0xFF4CAF7D) else Color(0xFF0B5E40)
-@Composable fun GreenLight(): Color = if (LocalIsDark.current) Color(0xFF2FA37C) else Color(0xFF147A55)
-@Composable fun Red(): Color = if (LocalIsDark.current) Color(0xFFE85D75) else Color(0xFFC81E3A)
-@Composable fun Bg(): Color = if (LocalIsDark.current) Color(0xFF121A16) else Color(0xFFF2F2F0)
-@Composable fun CardWhite(): Color = if (LocalIsDark.current) Color(0xFF1E2A24) else Color.White
+fun Green(): Color = Color(0xFF0B5E40)
+fun GreenLight(): Color = Color(0xFF147A55)
+fun Red(): Color = Color(0xFFC81E3A)
+fun Bg(): Color = Color(0xFFF2F2F0)
+fun CardWhite(): Color = Color.White
 // Premium design tokens (shared by all screens).
-@Composable fun DarkText(): Color = if (LocalIsDark.current) Color(0xFFE8F0EB) else Color(0xFF20382E)
-@Composable fun TitleGreen(): Color = if (LocalIsDark.current) Color(0xFFBFE3D2) else Color(0xFF173B2E)
-@Composable fun Muted(): Color = if (LocalIsDark.current) Color(0xFF9DB3A8) else Color(0xFF7C8D84)
-@Composable fun BodyText(): Color = if (LocalIsDark.current) Color(0xFFDCE8DF) else Color(0xFF263A31)
-@Composable fun LabelText(): Color = if (LocalIsDark.current) Color(0xFFB9C9BF) else Color(0xFF43534B)
-@Composable fun AccentGreen(): Color = if (LocalIsDark.current) Color(0xFF2FA37C) else Color(0xFF087653)
-@Composable fun Orange(): Color = if (LocalIsDark.current) Color(0xFFE08A5A) else Color(0xFFD66A36)
-@Composable fun OrangeBg(): Color = if (LocalIsDark.current) Color(0xFF3A2A1E) else Color(0xFFFFF1E8)
-@Composable fun GreenTint(): Color = if (LocalIsDark.current) Color(0xFF1F3A2C) else Color(0xFFE3F2EA)
-@Composable fun InBg(): Color = if (LocalIsDark.current) Color(0xFF1F3A2C) else Color(0xFFE8F5EE)
-@Composable fun OutBg(): Color = if (LocalIsDark.current) Color(0xFF3A2226) else Color(0xFFFFEEF0)
-@Composable fun IconBg(): Color = if (LocalIsDark.current) Color(0xFF22332A) else Color(0xFFF0F6F2)
-@Composable fun DividerLight(): Color = if (LocalIsDark.current) Color(0xFF2A3A31) else Color(0xFFF0F2F0)
-// App background (Home screen) — light grey-green, dark charcoal-green.
-@Composable fun AppBg(): Color = if (LocalIsDark.current) Color(0xFF121A16) else Color(0xFFF4F7F5)
+fun DarkText(): Color = Color(0xFF20382E)
+fun TitleGreen(): Color = Color(0xFF173B2E)
+fun Muted(): Color = Color(0xFF7C8D84)
+fun BodyText(): Color = Color(0xFF263A31)
+fun LabelText(): Color = Color(0xFF43534B)
+fun AccentGreen(): Color = Color(0xFF087653)
+fun Orange(): Color = Color(0xFFD66A36)
+fun OrangeBg(): Color = Color(0xFFFFF1E8)
+fun GreenTint(): Color = Color(0xFFE3F2EA)
+fun InBg(): Color = Color(0xFFE8F5EE)
+fun OutBg(): Color = Color(0xFFFFEEF0)
+fun IconBg(): Color = Color(0xFFF0F6F2)
+fun DividerLight(): Color = Color(0xFFF0F2F0)
+// App background (Home screen) — light grey-green.
+fun AppBg(): Color = Color(0xFFF4F7F5)
 
-// Reliable keyboard hide: Compose hide() + clearFocus() + InputMethodManager.
-// The IMM call is the one that actually dismisses the keyboard inside an
-// AlertDialog, where Compose's controller can be a no-op (keyboard stuck
-// after tapping a category radio). Owner rule: tapping ANYWHERE outside a
-// text field dismisses the keyboard; only tapping INTO a field keeps it open.
-fun hideKeyboard(ctx: android.content.Context) {
-    val imm = ctx.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-    var c: android.content.Context? = ctx
+// Reliable keyboard hide — MUST use the window token of the view that is
+// actually inside the window the keyboard is serving. The EntrySheet is an
+// AlertDialog (its own Window): hiding via the ACTIVITY's window token
+// (activity.currentFocus / decorView) is a no-op for the dialog's keyboard —
+// that is why three earlier fixes did nothing. Pass the view captured with
+// LocalView.current INSIDE the dialog content: it IS the dialog's compose
+// view, so its token is the dialog window's token. Call order: clearFocus()
+// first (with the dialog's own FocusManager), then this IMM hide.
+// Owner rule: tapping ANYWHERE outside a text field dismisses the keyboard;
+// only tapping INTO a field keeps it open.
+fun hideKeyboard(view: android.view.View) {
+    val imm = view.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+    imm?.hideSoftInputFromWindow(view.windowToken, 0)
+    // Belt and braces: also try the activity's currently-focused view token
+    // (covers text fields hosted in the activity window).
+    var c: android.content.Context? = view.context
     var activity: Activity? = null
     while (c != null) {
         if (c is Activity) { activity = c; break }
         c = if (c is android.content.ContextWrapper) c.baseContext else null
     }
-    val view = activity?.currentFocus ?: activity?.window?.decorView
-    if (view != null) imm?.hideSoftInputFromWindow(view.windowToken, 0)
+    activity?.currentFocus?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
 }
 
 // Jameel Noori Nastaliq for Urdu text (bundled in res/font).
@@ -208,6 +212,7 @@ class MainActivity : FragmentActivity() {
     private fun startCompose() {
         setContent {
             val ctx = LocalContext.current
+            val view = LocalView.current
             val vm: AppViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
@@ -232,21 +237,14 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            // Dark mode: "dark" forces dark, "light" forces light, "auto" follows the system.
-            // Persisted in SharedPreferences by vm.setTheme; read on launch.
-            val themeMode by vm.theme.collectAsState()
-            val isDark = when (themeMode) {
-                "dark" -> true
-                "light" -> false
-                else -> isSystemInDarkTheme()
-            }
             // Tap-outside-to-dismiss for every screen (empty space only;
             // buttons/fields still get their own taps).
             val focusManager = LocalFocusManager.current
             val keyboardController = LocalSoftwareKeyboardController.current
-            CompositionLocalProvider(LocalIsDark provides isDark) {
+            // Light-only: dark mode removed (owner, Nov 10) — the app stays on
+            // the original green/light theme; no theme setting anywhere.
             MaterialTheme(
-                colorScheme = if (isDark) darkColorScheme(primary = Color(0xFF4CAF7D), secondary = Color(0xFF2FA37C)) else lightColorScheme(primary = Color(0xFF0B5E40), secondary = Color(0xFF147A55)),
+                colorScheme = lightColorScheme(primary = Color(0xFF0B5E40), secondary = Color(0xFF147A55)),
                 typography = if (lang == "ur") urduTypography() else Typography()
             ) {
                 if (!unlocked) {
@@ -272,7 +270,7 @@ class MainActivity : FragmentActivity() {
                             Modifier.padding(pad)
                                 .pointerInput(Unit) {
                                     detectTapGestures(onTap = {
-                                        keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
+                                        keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view)
                                     })
                                 }
                         ) {
@@ -313,7 +311,6 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                 }
-            }
             }
         }
     }
@@ -410,7 +407,6 @@ fun SubPage(vm: AppViewModel, title: String, onBack: () -> Unit, content: @Compo
 fun ThreeDotMenu(vm: AppViewModel) {
     var expanded by remember { mutableStateOf(false) }
     val fpEnabled by vm.fingerprintEnabled.collectAsState()
-    val theme by vm.theme.collectAsState()
     val langVal by vm.lang.collectAsState()
     val ctx = LocalContext.current
     val activity = ctx as? FragmentActivity
@@ -474,19 +470,6 @@ fun ThreeDotMenu(vm: AppViewModel) {
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("\uD83C\uDFA8", fontSize = 18.sp)
-                                Spacer(Modifier.width(10.dp))
-                                Text("${vm.t("theme")}: ${themeName(theme, vm)}", fontSize = 15.sp)
-                            }
-                        },
-                        onClick = {
-                            val next = when (vm.theme.value) { "auto" -> "light"; "light" -> "dark"; else -> "auto" }
-                            vm.setTheme(next)
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("\uD83C\uDF10", fontSize = 18.sp)
                                 Spacer(Modifier.width(10.dp))
                                 Text("${vm.t("language")}: ${langName(langVal, vm)}", fontSize = 15.sp)
@@ -514,12 +497,6 @@ fun ThreeDotMenu(vm: AppViewModel) {
             }
         }
     }
-}
-
-fun themeName(theme: String, vm: AppViewModel): String = when (theme) {
-    "light" -> vm.t("light")
-    "dark" -> vm.t("dark")
-    else -> vm.t("auto")
 }
 
 fun langName(lang: String, vm: AppViewModel): String = when (lang) {
@@ -1111,9 +1088,6 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
     var catId by remember { mutableStateOf(categoryId ?: categories.firstOrNull { it.type == type }?.id ?: 0) }
     var memberId by remember { mutableStateOf(0) }
     var receiptUri by remember { mutableStateOf("") }
-    val ctx = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) receiptUri = uri.toString()
     }
@@ -1129,36 +1103,45 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
         onDismissRequest = onClose,
         title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense"), color = DarkText()) },
         text = {
+            // Keyboard locals MUST be read here, inside the dialog content:
+            // AlertDialog is its own Window, so the activity's FocusManager,
+            // keyboard controller and view token do NOT reach its text field.
+            // (That is why three earlier fixes did nothing — they all used
+            // the activity's window token.) LocalView.current here IS the
+            // dialog's compose view, so its token is the dialog window's.
+            val view = LocalView.current
+            val keyboardController = LocalSoftwareKeyboardController.current
+            val focusManager = LocalFocusManager.current
             // Tap anywhere outside a text field dismisses the keyboard
             // (the sheet's empty space). Tapping INTO a field keeps it open.
             Column(
                 Modifier.verticalScroll(rememberScrollState())
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = {
-                            keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
+                            keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view)
                         })
                     }
             ) {
-                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view) }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 if (categoryId == null) {
                     Text(vm.t("category"), fontWeight = FontWeight.Bold, color = DarkText(), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
                     categories.filter { it.type == type }.forEach { c ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); catId = c.id })
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); catId = c.id })
                             Text(c.name)
                         }
                     }
                 }
                 if (isAdmin && members.isNotEmpty()) {
                     Text(vm.t("memberName"), fontWeight = FontWeight.Bold, color = DarkText(), fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
-                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = 0 }.padding(vertical = 4.dp)) {
-                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = 0 }); Text(vm.t("admin"))
+                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); memberId = 0 }.padding(vertical = 4.dp)) {
+                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); memberId = 0 }); Text(vm.t("admin"))
                     }
                     members.forEach { m ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = m.id }.padding(vertical = 4.dp)) {
-                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx); memberId = m.id }); Text(m.name)
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); memberId = m.id }.padding(vertical = 4.dp)) {
+                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view); memberId = m.id }); Text(m.name)
                         }
                     }
                 }
@@ -1176,8 +1159,11 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
             }
         },
         confirmButton = {
+            val view = LocalView.current
+            val keyboardController = LocalSoftwareKeyboardController.current
+            val focusManager = LocalFocusManager.current
             Button(onClick = {
-                keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(ctx)
+                keyboardController?.hide(); focusManager.clearFocus(); hideKeyboard(view)
                 val amt = amount.toLongOrNull() ?: 0L
                 if (amt > 0 && catId != 0) {
                     val mName = if (memberId == 0) "Admin" else members.firstOrNull { it.id == memberId }?.name ?: "Admin"
