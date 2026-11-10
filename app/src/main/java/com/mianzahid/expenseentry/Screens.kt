@@ -10,9 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -64,20 +61,21 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
         }
         Text(vm.t("permanentRecord"), fontSize = 12.sp, color = Muted())
         Spacer(Modifier.height(8.dp))
-        LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-            items(categories) { c ->
-                val list = entries.filter { it.categoryId == c.id }
-                val total = list.sumOf { it.amount }
-                Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite()), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${categoryIcon(c.name)} ${vm.catName(c)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BodyText())
-                            if (isAdmin) Text("🗑", modifier = Modifier.clickable { confirmDelete = c })
-                        }
-                        Text(fmtRs(total), color = if (c.type == "IN") Green() else Red(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text("${list.size} ${vm.t("entries")} →", fontSize = 12.sp, color = Muted())
-                        Text(if (c.type == "IN") vm.t("totalReceived") else vm.t("totalExpenses"), fontSize = 11.sp, color = Muted())
-                    }
+        // Grouped by type (owner, Nov 11 — 10th rebuild): CASH IN (green) and
+        // CASH OUT (red) side by side; every category — including new
+        // user-created ones — lands under its own type heading (IN → Cash In,
+        // OUT → Cash Out). Amounts stay green (income) / red (expense).
+        val inCats = categories.filter { it.type == "IN" }
+        val outCats = categories.filter { it.type == "OUT" }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("CASH IN", color = Green(), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                    inCats.forEach { c -> CategoryCard(vm, c, entries, isAdmin, onOpen) { confirmDelete = it } }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("CASH OUT", color = Red(), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                    outCats.forEach { c -> CategoryCard(vm, c, entries, isAdmin, onOpen) { confirmDelete = it } }
                 }
             }
         }
@@ -98,6 +96,24 @@ fun CategoriesScreen(vm: AppViewModel, onOpen: (Int) -> Unit) {
             text = { Text(vm.t("deleteCategoryConfirm")) },
             confirmButton = { Button(onClick = { vm.deleteCategory(confirmDelete!!.id); confirmDelete = null }, colors = ButtonDefaults.buttonColors(containerColor = Red()), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("delete")) } },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(vm.t("cancel")) } })
+    }
+}
+
+// One category tile on the Categories screen (shared by the Cash In / Cash Out columns).
+@Composable
+fun CategoryCard(vm: AppViewModel, c: Category, entries: List<Entry>, isAdmin: Boolean, onOpen: (Int) -> Unit, onDelete: (Category) -> Unit) {
+    val list = entries.filter { it.categoryId == c.id }
+    val total = list.sumOf { it.amount }
+    Card(Modifier.clickable { onOpen(c.id) }, shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite()), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        Column(Modifier.padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${categoryIcon(c.name)} ${vm.catName(c)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BodyText())
+                if (isAdmin) Text("🗑", modifier = Modifier.clickable { onDelete(c) })
+            }
+            Text(fmtRs(total), color = if (c.type == "IN") Green() else Red(), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("${list.size} ${vm.t("entries")} →", fontSize = 12.sp, color = Muted())
+            Text(if (c.type == "IN") vm.t("totalReceived") else vm.t("totalExpenses"), fontSize = 11.sp, color = Muted())
+        }
     }
 }
 
