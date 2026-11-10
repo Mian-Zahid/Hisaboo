@@ -39,6 +39,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -48,8 +49,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -69,6 +72,20 @@ val GreenLight = Color(0xFF147A55)
 val Red = Color(0xFFC81E3A)
 val Bg = Color(0xFFF2F2F0)
 val CardWhite = Color.White
+// Premium design tokens (shared by all screens).
+val DarkText = Color(0xFF20382E)
+val TitleGreen = Color(0xFF173B2E)
+val Muted = Color(0xFF7C8D84)
+val BodyText = Color(0xFF263A31)
+val LabelText = Color(0xFF43534B)
+val AccentGreen = Color(0xFF087653)
+val Orange = Color(0xFFD66A36)
+val OrangeBg = Color(0xFFFFF1E8)
+val GreenTint = Color(0xFFE3F2EA)
+val InBg = Color(0xFFE8F5EE)
+val OutBg = Color(0xFFFFEEF0)
+val IconBg = Color(0xFFF0F6F2)
+val DividerLight = Color(0xFFF0F2F0)
 
 // Jameel Noori Nastaliq for Urdu text (bundled in res/font).
 val UrduFontFamily = FontFamily(Font(R.font.jameel_noori_nastaleeq))
@@ -333,7 +350,7 @@ fun SubPage(vm: AppViewModel, title: String, onBack: () -> Unit, content: @Compo
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back") }
-            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkText, modifier = Modifier.weight(1f))
             ThreeDotMenu(vm)
         }
         Box(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
@@ -471,6 +488,8 @@ object NavBus {
 
 @Composable
 fun LockScreen(vm: AppViewModel) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val ctx = LocalContext.current
     val activity = ctx as? FragmentActivity
     val lang by vm.lang.collectAsState()
@@ -515,39 +534,39 @@ fun LockScreen(vm: AppViewModel) {
         Text(vm.t("appName"), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Green)
         Spacer(Modifier.height(24.dp))
         if (joinMode) {
-            OutlinedTextField(value = code, onValueChange = { code = it.uppercase() }, label = { Text(vm.t("enterCode")) }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = joinName, onValueChange = { joinName = it }, label = { Text(vm.t("yourName")) }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(value = joinPin, onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) joinPin = it }, label = { Text(vm.t("setPin")) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = code, onValueChange = { code = it.uppercase() }, label = { Text(vm.t("enterCode")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = joinName, onValueChange = { joinName = it }, label = { Text(vm.t("yourName")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = joinPin, onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) joinPin = it }, label = { Text(vm.t("setPin")) }, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            Button(onClick = {
+            Button(onClick = { keyboardController?.hide(); focusManager.clearFocus()
                 if (vm.joinWithInvite(code, joinName, joinPin)) joinMsg = "✓ Joined" else joinMsg = vm.t("wrongPin")
-            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("join")) }
+            }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("join")) }
             if (joinMsg.isNotEmpty()) Text(joinMsg, color = Green)
             TextButton(onClick = { joinMode = false }) { Text(vm.t("cancel")) }
         } else if (settingUp) {
-            Text(vm.t("setPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(vm.t("setPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
             var phase by remember { mutableStateOf(0) } // 0 = new PIN, 1 = confirm
             if (phase == 0) {
                 PinDots(pin)
                 NumberPad(onDigit = { if (pin.length < 6) pin += it }, onDelete = { pin = pin.dropLast(1) })
                 if (pin.length >= 4) {
-                    Button(onClick = { phase = 1 }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("confirmPin")) }
+                    Button(onClick = { phase = 1 }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("confirmPin")) }
                 }
             } else {
-                Text(vm.t("confirmPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(vm.t("confirmPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
                 PinDots(confirm)
                 NumberPad(onDigit = { if (confirm.length < 6) { confirm += it; if (confirm.length == pin.length) { if (confirm == pin) { vm.setAdminPin(pin); vm.unlockAsAdmin() } else { error = vm.t("pinMismatch"); pin = ""; confirm = ""; phase = 0 } } } }, onDelete = { confirm = confirm.dropLast(1) })
                 TextButton(onClick = { phase = 0; pin = ""; confirm = "" }) { Text(vm.t("cancel")) }
             }
             if (error.isNotEmpty()) Text(error, color = Red)
         } else {
-            Text(vm.t("enterPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(vm.t("enterPin"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkText)
             PinDots(pin)
             if (error.isNotEmpty()) Text(error, color = Red)
             NumberPad(onDigit = { if (pin.length < 6) { pin += it; tryUnlock(pin) } }, onDelete = { pin = pin.dropLast(1); error = "" })
             Spacer(Modifier.height(12.dp))
             if (fpEnabled) {
-                OutlinedButton(onClick = ::biometric, modifier = Modifier.fillMaxWidth()) { Text("👆 ${vm.t("useFingerprint")}") }
+                OutlinedButton(onClick = ::biometric, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("👆 ${vm.t("useFingerprint")}") }
             }
             TextButton(onClick = { joinMode = true }) { Text(vm.t("joinWithCode")) }
             Row {
@@ -602,106 +621,294 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
     val viewer by vm.viewer.collectAsState()
     val hadith by vm.dailyHadith.collectAsState()
     LaunchedEffect(Unit) { vm.fetchDailyHadith() }
-    var showEntry by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
+    var showEntry by remember { mutableStateOf<String?>(null) }
     var showShortcutPicker by remember { mutableStateOf<Int?>(null) }
 
     val topCat = categories.filter { it.type == "OUT" }
         .map { c -> c to entries.filter { e -> e.categoryId == c.id && e.type == "OUT" }.sumOf { it.amount } }
         .maxByOrNull { it.second }
+    val recentEntries = entries.sortedByDescending { it.dateMillis }.take(4)
 
-    // Static one-screen layout: no scroll
     Column(
-        Modifier.fillMaxSize().background(Bg).padding(horizontal = 12.dp, vertical = 6.dp)
+        Modifier.fillMaxSize().background(Color(0xFFF4F7F5))
+            .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(vm.t("appName"), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(if (isAdmin) "👑 ${vm.t("adminAccess")}" else "👤 ${viewer?.name ?: ""}", fontSize = 11.sp, color = Green,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F2EA)).padding(horizontal = 8.dp, vertical = 4.dp))
+        // App bar
+        Row(
+            Modifier.fillMaxWidth().height(46.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    vm.t("appName"),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF173B2E)
+                )
+                Text(
+                    fullDate(System.currentTimeMillis(), lang),
+                    fontSize = 10.sp,
+                    color = Color(0xFF7C8D84)
+                )
+            }
+            Text(
+                if (isAdmin) "👑 ${vm.t("adminAccess")}" else "👤 ${viewer?.name ?: ""}",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF087653),
+                modifier = Modifier.clip(RoundedCornerShape(50))
+                    .background(Color(0xFFE3F2EA))
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            )
+            Spacer(Modifier.width(6.dp))
             ThreeDotMenu(vm)
         }
-        // Balance card
-        Card(
-            Modifier.fillMaxWidth().animateContentSize(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Green)
+
+        // Main dashboard scroll area. Primary cash actions remain fixed below.
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(Modifier.padding(14.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(vm.t("balanceInHand"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(fullDate(System.currentTimeMillis(), lang), color = Color.White, fontSize = 11.sp,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 3.dp))
-                }
-                Text(fmtRs(dash.balance), color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                Text(vm.t("amountWithYou"), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)).padding(10.dp)) {
-                        Column { Text(vm.t("totalIn"), color = Color.White, fontSize = 11.sp); Text(fmtRs(dash.totalIn), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-                    }
-                    Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)).padding(10.dp)) {
-                        Column { Text(vm.t("totalOut"), color = Color.White, fontSize = 11.sp); Text(fmtRs(dash.totalOut), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        // Top expense card (slim, one-line label)
-        if (topCat != null && topCat.second > 0) {
-            Card(
-                Modifier.fillMaxWidth().clickable { onGo(Screen.CategoryDetail(topCat.first.id)) },
-                shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardWhite)
+            // Premium balance card
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF087653), Color(0xFF004D38))
+                        )
+                    ).padding(18.dp)
             ) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🔥", fontSize = 26.sp)
-                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text(vm.t("topExpense"), fontSize = 11.sp, color = Color.Gray, maxLines = 1)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(vm.catName(topCat.first), fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                            Text("  •  ${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}", fontSize = 12.sp, color = Color.Gray)
-                        }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        vm.t("balanceInHand").uppercase(),
+                        color = Color.White.copy(alpha = 0.84f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.7.sp
+                    )
+                    Text(
+                        "CASH",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(50))
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    fmtRs(dash.balance),
+                    color = Color.White,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
+                )
+                Text(
+                    vm.t("amountWithYou"),
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.height(17.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+                            .background(Color.White.copy(alpha = 0.13f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Text(vm.t("totalIn"), color = Color.White.copy(alpha = 0.75f), fontSize = 10.sp)
+                        Spacer(Modifier.height(3.dp))
+                        Text(fmtRs(dash.totalIn), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
-                    Text(fmtRs(topCat.second), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Red)
-                    Text(" ›", fontSize = 20.sp, color = Color.Gray)
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+                            .background(Color.White.copy(alpha = 0.13f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Text(vm.t("totalOut"), color = Color.White.copy(alpha = 0.75f), fontSize = 10.sp)
+                        Spacer(Modifier.height(3.dp))
+                        Text(fmtRs(dash.totalOut), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-        }
-        // 6 customizable shortcuts 3+3
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(0 to 2, 3 to 5).forEach { (a, b) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (i in a..b) {
-                        val key = shortcuts.getOrNull(i) ?: ""
+
+            // Highest spending category
+            if (topCat != null && topCat.second > 0) {
+                Card(
+                    Modifier.fillMaxWidth().clickable { onGo(Screen.CategoryDetail(topCat.first.id)) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(
-                            Modifier.weight(1f).height(76.dp).clip(RoundedCornerShape(12.dp))
-                                .background(Color.White).combinedClickable(
-                                    onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
-                                    onLongClick = { showShortcutPicker = i }
-                                ),
+                            Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFFFF1E8)),
                             contentAlignment = Alignment.Center
-                        ) {
-                            if (key.isBlank()) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("+", fontSize = 18.sp, color = Color.Gray)
-                                    Text(vm.t("addShortcut"), fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                        ) { Text("↗", color = Color(0xFFD66A36), fontSize = 23.sp, fontWeight = FontWeight.Bold) }
+                        Column(Modifier.weight(1f).padding(start = 11.dp)) {
+                            Text(vm.t("topExpense"), fontSize = 10.sp, color = Color(0xFF839087))
+                            Text(vm.catName(topCat.first), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E), maxLines = 1)
+                            Text(
+                                "${entries.count { it.categoryId == topCat.first.id }} ${vm.t("entries")}",
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        Text(fmtRs(topCat.second), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Red)
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color.LightGray)
+                    }
+                }
+            }
+
+            // Six customizable shortcuts
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    vm.t("categories"),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF20382E)
+                )
+                listOf(0 to 2, 3 to 5).forEach { (a, b) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        for (i in a..b) {
+                            val key = shortcuts.getOrNull(i) ?: ""
+                            Column(
+                                Modifier.weight(1f).height(88.dp)
+                                    .clip(RoundedCornerShape(17.dp))
+                                    .background(CardWhite)
+                                    .combinedClickable(
+                                        onClick = { if (key.isBlank()) showShortcutPicker = i else onGo(shortcutToScreen(key)) },
+                                        onLongClick = { showShortcutPicker = i }
+                                    ).padding(horizontal = 4.dp, vertical = 9.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    Modifier.size(38.dp).clip(RoundedCornerShape(13.dp))
+                                        .background(Color(0xFFF0F6F2)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        if (key.isBlank()) "+" else shortcutIcon(key, categories),
+                                        fontSize = if (key.isBlank()) 23.sp else 19.sp,
+                                        color = Green
+                                    )
                                 }
-                            } else {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(shortcutIcon(key, categories), fontSize = 20.sp)
-                                    Text(shortcutLabel(vm, key), fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 1)
-                                }
+                                Spacer(Modifier.height(5.dp))
+                                Text(
+                                    if (key.isBlank()) vm.t("addShortcut") else shortcutLabel(vm, key),
+                                    fontSize = 9.sp,
+                                    color = Color(0xFF43534B),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
                 }
             }
+
+            // Recent entries, using existing transaction records only
+            if (recentEntries.isNotEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                        .background(CardWhite).padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(vm.t("entries"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF20382E))
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            vm.t("categories"),
+                            fontSize = 10.sp,
+                            color = Green,
+                            modifier = Modifier.clickable { onGo(Screen.Categories) }
+                        )
+                    }
+                    recentEntries.forEachIndexed { index, entry ->
+                        val category = categories.firstOrNull { it.id == entry.categoryId }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(36.dp).clip(RoundedCornerShape(12.dp))
+                                    .background(if (entry.type == "IN") Color(0xFFE8F5EE) else Color(0xFFFFEEF0)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (entry.type == "IN") "↓" else "↑",
+                                    color = if (entry.type == "IN") Green else Red,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                                Text(
+                                    if (entry.note.isNotBlank()) vm.noteDisplay(entry.note)
+                                    else category?.let { vm.catName(it) } ?: vm.t("entries"),
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF263A31),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${shortDate(entry.dateMillis, lang)} • ${vm.memberDisplayName(entry.memberName)}",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray,
+                                    maxLines = 1
+                                )
+                            }
+                            Text(
+                                (if (entry.type == "IN") "+ " else "− ") + fmtRs(entry.amount),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (entry.type == "IN") Green else Red,
+                                maxLines = 1
+                            )
+                        }
+                        if (index < recentEntries.lastIndex) {
+                            HorizontalDivider(color = Color(0xFFF0F2F0), thickness = 1.dp)
+                        }
+                    }
+                }
+            }
+
+            // Daily Hadith preserved below the financial overview
+            DailyHadithCard(vm, hadith)
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        DailyHadithCard(vm, hadith)
-        Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { showEntry = "IN" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text(vm.t("moneyIn"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-            Button(onClick = { showEntry = "OUT" }, modifier = Modifier.weight(1f).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Red), shape = RoundedCornerShape(14.dp)) { Text(vm.t("expense"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                onClick = { showEntry = "IN" },
+                modifier = Modifier.weight(1f).height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087653)),
+                shape = RoundedCornerShape(17.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(vm.t("moneyIn"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = { showEntry = "OUT" },
+                modifier = Modifier.weight(1f).height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD7264D)),
+                shape = RoundedCornerShape(17.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Icon(Icons.Filled.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(vm.t("expense"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 
@@ -831,6 +1038,7 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
     var receiptUri by remember { mutableStateOf("") }
     val ctx = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) receiptUri = uri.toString()
     }
@@ -844,55 +1052,55 @@ fun EntrySheet(vm: AppViewModel, type: String, categoryId: Int? = null, onClose:
     }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense")) },
+        title = { Text(if (type == "IN") vm.t("moneyIn") else vm.t("expense"), color = DarkText) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = amount, onValueChange = { if (it.all { c -> c.isDigit() }) amount = it }, label = { Text(vm.t("amount")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(vm.t("note")) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { keyboardController?.hide(); focusManager.clearFocus() }), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth())
                 if (categoryId == null) {
-                    Text(vm.t("category"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                    Text(vm.t("category"), fontWeight = FontWeight.Bold, color = DarkText, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
                     categories.filter { it.type == type }.forEach { c ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); catId = c.id })
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = catId == c.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); catId = c.id })
                             Text(c.name)
                         }
                     }
                 }
                 if (isAdmin && members.isNotEmpty()) {
-                    Text(vm.t("memberName"), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = 0 }.padding(vertical = 4.dp)) {
-                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); memberId = 0 }); Text(vm.t("admin"))
+                    Text(vm.t("memberName"), fontWeight = FontWeight.Bold, color = DarkText, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                    Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); memberId = 0 }.padding(vertical = 4.dp)) {
+                        RadioButton(selected = memberId == 0, onClick = { keyboardController?.hide(); focusManager.clearFocus(); memberId = 0 }); Text(vm.t("admin"))
                     }
                     members.forEach { m ->
-                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); memberId = m.id }.padding(vertical = 4.dp)) {
-                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); memberId = m.id }); Text(m.name)
+                        Row(Modifier.fillMaxWidth().clickable { keyboardController?.hide(); focusManager.clearFocus(); memberId = m.id }.padding(vertical = 4.dp)) {
+                            RadioButton(selected = memberId == m.id, onClick = { keyboardController?.hide(); focusManager.clearFocus(); memberId = m.id }); Text(m.name)
                         }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                    OutlinedButton(onClick = { pickImage.launch("image/*") }, modifier = Modifier.weight(1f)) { Text("📷 ${vm.t("receiptPhoto")}", maxLines = 1) }
+                    OutlinedButton(onClick = { pickImage.launch("image/*") }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("📷 ${vm.t("receiptPhoto")}", maxLines = 1) }
                     OutlinedButton(onClick = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ur-PK")
                         }
                         try { speech.launch(intent) } catch (e: Exception) { vm.showToast(vm.t("voiceNotSupported")) }
-                    }, modifier = Modifier.weight(1f)) { Text("🎤 ${vm.t("voiceEntry")}", maxLines = 1) }
+                    }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("🎤 ${vm.t("voiceEntry")}", maxLines = 1) }
                 }
                 if (receiptUri.isNotEmpty()) Text("✓ ${vm.t("receiptPhoto")}", color = Green, fontSize = 12.sp)
             }
         },
         confirmButton = {
             Button(onClick = {
-                keyboardController?.hide()
+                keyboardController?.hide(); focusManager.clearFocus()
                 val amt = amount.toLongOrNull() ?: 0L
                 if (amt > 0 && catId != 0) {
                     val mName = if (memberId == 0) "Admin" else members.firstOrNull { it.id == memberId }?.name ?: "Admin"
                     vm.addEntry(catId, amt, note, System.currentTimeMillis(), memberId, mName, receiptUri)
                     onClose()
                 }
-            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(vm.t("save")) }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(17.dp), elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)) { Text(vm.t("save")) }
         },
         dismissButton = { TextButton(onClick = onClose) { Text(vm.t("cancel")) } }
     )
