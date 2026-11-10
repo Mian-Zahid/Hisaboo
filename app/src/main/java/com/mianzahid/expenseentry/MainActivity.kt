@@ -924,31 +924,9 @@ fun HomeScreen(vm: AppViewModel, onGo: (Screen) -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { showEntry = "IN" },
-                modifier = Modifier.weight(1f).height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087653)),
-                shape = RoundedCornerShape(17.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(5.dp))
-                Text(vm.t("moneyIn"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-            Button(
-                onClick = { showEntry = "OUT" },
-                modifier = Modifier.weight(1f).height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD7264D)),
-                shape = RoundedCornerShape(17.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-            ) {
-                Icon(Icons.Filled.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(5.dp))
-                Text(vm.t("expense"), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-        }
+        // "+ Money In" / "+ Expense" buttons REMOVED from Home (owner, Nov 11 —
+        // 10th rebuild). Entries are still added via Categories → a category →
+        // "+ Add Entries" (CategoryDetailScreen), which opens the same EntrySheet.
     }
 
     if (showShortcutPicker != null) {
