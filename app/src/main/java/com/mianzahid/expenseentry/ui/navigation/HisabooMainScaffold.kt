@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -33,13 +35,13 @@ object HisabooRoutes {
     const val HOME = "home"
     const val CATEGORIES = "categories"
     const val TOOLS = "tools"
+    const val LOAN = "loan"
     const val CATEGORY_DETAIL = "category_detail/{categoryId}"
     const val REPORT = "report"
     const val BUDGET = "budget"
     const val PLANNED_PAYMENTS = "planned_payments"
     const val SEARCH = "search"
     const val REMINDERS = "reminders"
-    const val LOAN = "loan"
     const val UTILITY_BILLS = "utility_bills"
     const val FAMILY = "family"
     const val BACKUP = "backup"
@@ -67,7 +69,8 @@ fun HisabooMainScaffold(
     val dockTabs = listOf(
         DockTab(HisabooRoutes.HOME, "Home", Icons.Rounded.Home),
         DockTab(HisabooRoutes.CATEGORIES, "Categories", Icons.Rounded.Category),
-        DockTab(HisabooRoutes.TOOLS, "Tools", Icons.Rounded.Calculate)
+        DockTab(HisabooRoutes.TOOLS, "Tools", Icons.Rounded.Calculate),
+        DockTab(HisabooRoutes.LOAN, "Loan", Icons.Rounded.Handshake)
     )
 
     val showFloatingDock = currentRoute in dockTabs.map { it.route }
@@ -130,6 +133,21 @@ fun HisabooMainScaffold(
                 ToolsScreen(viewModel = viewModel)
             }
 
+            composable(HisabooRoutes.LOAN) {
+                LoanScreen(
+                    viewModel = viewModel,
+                    onBack = {
+                        navController.navigate(HisabooRoutes.HOME) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
             composable(
                 route = HisabooRoutes.CATEGORY_DETAIL,
                 arguments = listOf(navArgument("categoryId") { type = NavType.StringType })
@@ -172,13 +190,6 @@ fun HisabooMainScaffold(
 
             composable(HisabooRoutes.REMINDERS) {
                 RemindersScreen(
-                    viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
-                )
-            }
-
-            composable(HisabooRoutes.LOAN) {
-                LoanScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() }
                 )
@@ -238,7 +249,7 @@ private fun FloatingGlassCapsuleDock(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 28.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -246,8 +257,8 @@ private fun FloatingGlassCapsuleDock(
                 .clip(CircleShape)
                 .background(SurfaceGlass.copy(alpha = 0.96f))
                 .border(1.dp, BorderGlass, CircleShape)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 8.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEach { tab ->
@@ -258,24 +269,25 @@ private fun FloatingGlassCapsuleDock(
                         .background(if (isSelected) EmeraldPrimary else Color.Transparent)
                         .clickable { onSelectTab(tab.route) }
                         .padding(
-                            horizontal = if (isSelected) 18.dp else 14.dp,
-                            vertical = 10.dp
+                            horizontal = if (isSelected) 14.dp else 12.dp,
+                            vertical = 9.dp
                         ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = tab.icon,
                         contentDescription = tab.label,
                         tint = if (isSelected) OnEmeraldPrimary else TextSecondary,
-                        modifier = Modifier.size(21.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     AnimatedVisibility(visible = isSelected) {
                         Text(
                             text = tab.label,
-                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OnEmeraldPrimary
+                            color = OnEmeraldPrimary,
+                            maxLines = 1
                         )
                     }
                 }
