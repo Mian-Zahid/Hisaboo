@@ -15,8 +15,12 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.mianzahid.expenseentry.model.*
 import com.mianzahid.expenseentry.storage.GoogleCloudBackupManager
 import com.mianzahid.expenseentry.storage.HisabooStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +55,22 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     var currentPin by mutableStateOf("1234")
     var lastBackupText by mutableStateOf("Never")
     var usdToPkrRate by mutableDoubleStateOf(278.50)
+    var isFetchingRate by mutableStateOf(false)
+    var rateStatusText by mutableStateOf("Tap refresh for live rate")
+    val liveCurrencyRates = mutableStateMapOf(
+        "PKR" to 278.50,
+        "USD" to 1.0,
+        "EUR" to 0.92,
+        "GBP" to 0.79,
+        "SAR" to 3.75,
+        "AED" to 3.67,
+        "INR" to 84.40,
+        "CAD" to 1.39,
+        "AUD" to 1.54,
+        "CNY" to 7.24,
+        "TRY" to 34.50,
+        "KWD" to 0.31
+    )
 
     // Gmail / Google Cloud Sync State
     var connectedGoogleEmail by mutableStateOf<String?>(null)
@@ -58,8 +78,8 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     var isCloudSyncing by mutableStateOf(false)
     var cloudStatusBanner by mutableStateOf<String?>(null)
 
-    // Hadith State
-    var selectedHadithLang by mutableStateOf(HadithLanguage.ENGLISH)
+    // Hadith State (Default: URDU)
+    var selectedHadithLang by mutableStateOf(HadithLanguage.URDU)
     val dailyHadith = DailyHadith(
         arabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
         urdu = "اعمال کا دارومدار نیتوں پر ہے اور ہر شخص کو وہی ملے گا جس کی اس نے نیت کی۔",
@@ -76,6 +96,11 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             persistState(triggerCloudSync = false)
         }
 
+        liveCurrencyRates["PKR"] = usdToPkrRate
+
+        // Auto-fetch latest live USD exchange rates on startup
+        fetchLiveUsdRate()
+
         // Check if user was already signed in with Gmail/Google
         val lastAccount = cloudManager.getLastSignedInAccount()
         if (lastAccount != null && !lastAccount.email.isNullOrBlank()) {
@@ -83,6 +108,65 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             // If fresh install (no transactions yet) & signed in, auto-restore from cloud!
             if (transactions.isEmpty()) {
                 autoRestoreFromCloudIfAvailable(lastAccount)
+            }
+        }
+    }
+
+    fun fetchLiveUsdRate() {
+        if (isFetchingRate) return
+        viewModelScope.launch {
+            isFetchingRate = true
+            rateStatusText = "Updating live rate..."
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val url = URL("https://open.er-api.com/v6/latest/USD")
+                    val conn = (url.openConnection() as HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        connectTimeout = 10000
+                        readTimeout = 10000
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("User-Agent", "HisabooApp/1.0")
+                    }
+                    try {
+                        if (conn.responseCode == 200) {
+                            conn.inputStream.bufferedReader().use { it.readText() }
+                        } else {
+                            null
+                        }
+                    } finally {
+                        conn.disconnect()
+                    }
+                }
+
+                if (!result.isNullOrBlank()) {
+                    val json = JSONObject(result)
+                    val ratesObj = json.optJSONObject("rates")
+                    if (ratesObj != null) {
+                        val pkr = ratesObj.optDouble("PKR", -1.0)
+                        if (pkr > 0) {
+                            usdToPkrRate = pkr
+                            liveCurrencyRates["PKR"] = pkr
+                            persistState(triggerCloudSync = false)
+                        }
+                        val codes = listOf("USD", "EUR", "GBP", "SAR", "AED", "INR", "CAD", "AUD", "CNY", "TRY", "KWD")
+                        for (code in codes) {
+                            val valRate = ratesObj.optDouble(code, -1.0)
+                            if (valRate > 0) {
+                                liveCurrencyRates[code] = valRate
+                            }
+                        }
+                        val time = SimpleDateFormat("hh:mm a, dd MMM", Locale.US).format(Date())
+                        rateStatusText = "Live updated: $time"
+                    } else {
+                        rateStatusText = "Could not parse rate (offline?)"
+                    }
+                } else {
+                    rateStatusText = "Network unavailable — using saved rate"
+                }
+            } catch (e: Exception) {
+                rateStatusText = "Update failed — check internet"
+            } finally {
+                isFetchingRate = false
             }
         }
     }
@@ -565,6 +649,7 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     fun updateUsdRate(newRate: Double) {
         if (newRate > 0) {
             usdToPkrRate = newRate
+            liveCurrencyRates["PKR"] = newRate
             persistState()
         }
     }
