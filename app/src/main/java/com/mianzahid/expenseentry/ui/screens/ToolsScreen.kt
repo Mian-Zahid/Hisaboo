@@ -149,7 +149,7 @@ private fun StandardCalculatorSection() {
                 )
                 if (pendingOperator != null && firstOperand != null) {
                     Text(
-                        text = "${formatCalcNumber(firstOperand!!)}$pendingOperator",
+                        text = "${formatCalcNumber(firstOperand!!)} $pendingOperator",
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = TextSecondary
                     )
@@ -583,7 +583,7 @@ private fun UnitsConverterSection() {
         } else {
             String.format(Locale.US, "%.6f", outputVal).trimEnd('0').trimEnd('.')
         }
-        "$cleanNum${toUnit.symbol}"
+        "$cleanNum ${toUnit.symbol}"
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -715,3 +715,80 @@ private fun UnitsConverterSection() {
                                     .border(1.dp, BorderGlass, CircleShape)
                                     .clickable { toMenuExpanded = true }
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = toUnit.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = EmeraldPrimary
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = "Select To Unit",
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = toMenuExpanded,
+                                onDismissRequest = { toMenuExpanded = false },
+                                modifier = Modifier.background(SurfaceCard)
+                            ) {
+                                currentUnits.forEachIndexed { idx, option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = option.label,
+                                                color = if (idx == toIndex) EmeraldPrimary else TextPrimary,
+                                                fontWeight = if (idx == toIndex) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            toIndex = idx
+                                            toMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = formattedOutput,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CashInGreen,
+                        style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum")
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldPrimary)
+                    .border(3.dp, BgObsidian, CircleShape)
+                    .clickable {
+                        val temp = fromIndex
+                        fromIndex = toIndex
+                        toIndex = temp
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SwapVert,
+                    contentDescription = "Swap Units",
+                    tint = OnEmeraldPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
