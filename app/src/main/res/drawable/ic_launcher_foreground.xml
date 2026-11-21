@@ -4,28 +4,43 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Left Emerald Rounded Diamond Link -->
     <group
-        android:translateX="13.5"
-        android:translateY="13.5">
-        <!-- Emerald Balance Link (Left & Up-flow) -->
+        android:pivotX="45"
+        android:pivotY="54"
+        android:rotation="45">
         <path
+            android:fillColor="#00000000"
             android:strokeColor="#10B981"
-            android:strokeWidth="7"
-            android:strokeLineCap="round"
+            android:strokeWidth="6.5"
             android:strokeLineJoin="round"
-            android:pathData="M 32,18 L 18,32 C 10,40 10,54 18,62 L 32,76 C 40,84 54,84 62,76 L 68,70" />
+            android:pathData="M34,39 h22 a5,5 0 0 1 5,5 v20 a5,5 0 0 1 -5,5 h-22 a5,5 0 0 1 -5,-5 v-20 a5,5 0 0 1 5,-5 z" />
+    </group>
 
-        <!-- Gold Cash-Flow Link (Right & Down-flow Interlocking) -->
+    <!-- Right Gold Rounded Diamond Link -->
+    <group
+        android:pivotX="63"
+        android:pivotY="54"
+        android:rotation="45">
         <path
+            android:fillColor="#00000000"
             android:strokeColor="#FBBF24"
-            android:strokeWidth="7"
-            android:strokeLineCap="round"
+            android:strokeWidth="6.5"
             android:strokeLineJoin="round"
-            android:pathData="M 50,70 L 62,62 C 70,54 70,40 62,32 L 50,18 C 42,10 28,10 20,18 L 14,24" />
+            android:pathData="M52,39 h22 a5,5 0 0 1 5,5 v20 a5,5 0 0 1 -5,5 h-22 a5,5 0 0 1 -5,-5 v-20 a5,5 0 0 1 5,-5 z" />
+    </group>
 
-        <!-- Subtle Gradient Highlight/Joint dot -->
+    <!-- Emerald Over-weave Segment for True Interlocking Effect -->
+    <group
+        android:pivotX="45"
+        android:pivotY="54"
+        android:rotation="45">
         <path
-            android:fillColor="#FBBF24"
-            android:pathData="M37,42 C35,40 35,37 37,35 C39,33 42,33 44,35" />
+            android:fillColor="#00000000"
+            android:strokeColor="#10B981"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M46,39 h10 a5,5 0 0 1 5,5 v8" />
     </group>
 </vector>
