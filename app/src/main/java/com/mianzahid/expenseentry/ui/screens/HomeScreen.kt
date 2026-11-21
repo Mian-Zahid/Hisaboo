@@ -15,19 +15,24 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mianzahid.expenseentry.model.Transaction
-import com.mianzahid.expenseentry.model.TransactionType
+import com.mianzahid.expenseentry.model.*
+import com.mianzahid.expenseentry.ui.components.GlassCard
+import com.mianzahid.expenseentry.ui.components.TintedIconBadge
 import com.mianzahid.expenseentry.ui.navigation.HisabooRoutes
 import com.mianzahid.expenseentry.ui.theme.*
 import com.mianzahid.expenseentry.viewmodel.HisabooViewModel
-import com.mianzahid.expenseentry.viewmodel.formatCurrency
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,442 +42,579 @@ fun HomeScreen(
     onQuickCashOut: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
-    val transactions = viewModel.transactions
-    val totalIn = viewModel.totalCashIn()
-    val totalOut = viewModel.totalCashOut()
-    val netBalance = viewModel.netBalance()
-
     var showHubSheet by remember { mutableStateOf(false) }
-    var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
+    val todayHeaderDate = remember {
+        SimpleDateFormat("EEEE, dd MMM yyyy", Locale.US).format(Date())
+    }
 
-    Box(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(BgObsidian)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
-            contentPadding = PaddingValues(
-                start = 18.dp,
-                end = 18.dp,
-                top = 14.dp,
-                bottom = 110.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Top Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Hisaboo",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = TextPrimary,
-                            letterSpacing = (-0.5).sp
-                        )
-                        Text(
-                            text = viewModel.todayFormatted(),
-                            fontSize = 12.sp,
-                            color = TextSecondary
-                        )
-                    }
+        item {
+            HomeTopBar(dateSubtitle = todayHeaderDate, onOpenHub = { showHubSheet = true })
+        }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Search Shortcut
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(SurfaceGlass)
-                                .border(1.dp, BorderGlass, CircleShape)
-                                .clickable { onNavigate(HisabooRoutes.SEARCH) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = "Search",
-                                tint = TextPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+        item {
+            HeroWalletCard(
+                balance = viewModel.balanceInHand,
+                cashIn = viewModel.totalCashIn,
+                cashOut = viewModel.totalCashOut,
+                connectedEmail = viewModel.connectedGoogleEmail,
+                onBadgeClick = { onNavigate(HisabooRoutes.BACKUP) }
+            )
+        }
 
-                        // 4-Dots Hub Menu Button
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(SurfaceGlass)
-                                .border(1.dp, BorderGlass, CircleShape)
-                                .clickable { showHubSheet = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.GridView,
-                                contentDescription = "Hisaboo Hub",
-                                tint = EmeraldPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+        item {
+            QuickActionRow(
+                onCashIn = onQuickCashIn,
+                onCashOut = onQuickCashOut,
+                onBudget = { onNavigate(HisabooRoutes.BUDGET) },
+                onReport = { onNavigate(HisabooRoutes.REPORT) }
+            )
+        }
+
+        item {
+            DailyHadithCard(
+                hadith = viewModel.dailyHadith,
+                selectedLang = viewModel.selectedHadithLang,
+                onSelectLang = { viewModel.selectedHadithLang = it }
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Recent Transactions",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+                Text(
+                    text = "${viewModel.transactions.size} entries",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
             }
+        }
 
-            // Net Balance Hero Card
+        if (viewModel.transactions.isEmpty()) {
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFF102A22),
-                                    Color(0xFF0C1814)
-                                )
-                            )
-                        )
-                        .border(1.dp, EmeraldPrimary.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
-                        .padding(20.dp)
+                GlassCard(
+                    cornerRadius = 22.dp,
+                    contentPadding = PaddingValues(24.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column {
-                            Text(
-                                text = "NET BALANCE",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EmeraldPrimary,
-                                letterSpacing = 1.2.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = formatCurrency(netBalance),
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = TextPrimary
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Cash In Summary Pill
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(BgObsidian.copy(alpha = 0.55f))
-                                    .border(1.dp, CashInGreen.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ArrowDownward,
-                                        contentDescription = null,
-                                        tint = CashInGreen,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "Cash In",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = formatCurrency(totalIn),
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CashInGreen,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            // Cash Out Summary Pill
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(BgObsidian.copy(alpha = 0.55f))
-                                    .border(1.dp, CashOutRed.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ArrowUpward,
-                                        contentDescription = null,
-                                        tint = CashOutRed,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "Cash Out",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = formatCurrency(totalOut),
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CashOutRed,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick Action Buttons (+ Cash In / - Cash Out)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = onQuickCashIn,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EmeraldPrimary,
-                            contentColor = OnEmeraldPrimary
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                        TintedIconBadge(
+                            icon = Icons.Rounded.AccountBalanceWallet,
+                            tint = EmeraldPrimary,
+                            size = 48.dp,
+                            iconSize = 24.dp,
+                            isCircle = true
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Cash In",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "No transactions recorded yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
                         )
-                    }
-
-                    Button(
-                        onClick = onQuickCashOut,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CashOutRed.copy(alpha = 0.16f),
-                            contentColor = CashOutRed
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            CashOutRed.copy(alpha = 0.45f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Remove,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Cash Out",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Tap + Cash In or - Cash Out above — entries auto-save offline & sync to Gmail when connected",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
             }
-
-            // Recent Transactions Section Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Entries",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "${transactions.size} total",
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            if (transactions.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(SurfaceGlass)
-                            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
-                            .padding(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Rounded.ReceiptLong,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(36.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "No entries yet",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Tap + Cash In or - Cash Out to record your first entry",
-                                fontSize = 12.sp,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(transactions, key = { it.id }) { tx ->
-                    TransactionRowCard(
-                        transaction = tx,
-                        onClick = { editingTransaction = tx }
-                    )
-                }
+        } else {
+            items(viewModel.transactions.take(6), key = { it.id }) { tx ->
+                TransactionRowCard(
+                    entry = tx,
+                    onDelete = { viewModel.deleteTransaction(tx.id) }
+                )
             }
         }
     }
 
-    // 4-Dots Hub Bottom Sheet
     if (showHubSheet) {
         ModalBottomSheet(
             onDismissRequest = { showHubSheet = false },
-            containerColor = SurfaceGlass,
+            containerColor = SurfaceCard,
             contentColor = TextPrimary,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 12.dp)
+                        .width(42.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(BorderGlass)
+                )
+            }
         ) {
             HisabooHubSheetContent(
-                onSelectModule = { route ->
+                viewModel = viewModel,
+                onDismiss = { showHubSheet = false },
+                onNavigate = { route ->
                     showHubSheet = false
                     onNavigate(route)
                 }
             )
         }
     }
+}
 
-    // Edit / Delete Transaction Dialog
-    editingTransaction?.let { tx ->
-        EditTransactionDialog(
-            transaction = tx,
-            categories = viewModel.categories.filter { it.type == tx.type },
-            onDismiss = { editingTransaction = null },
-            onSave = { updated ->
-                viewModel.updateTransaction(updated)
-                editingTransaction = null
-            },
-            onDelete = {
-                viewModel.deleteTransaction(tx.id)
-                editingTransaction = null
+@Composable
+private fun HomeTopBar(dateSubtitle: String, onOpenHub: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldGlowTint)
+                    .border(1.dp, EmeraldPrimary.copy(alpha = 0.45f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "H",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = EmeraldPrimary
+                )
             }
+
+            Column {
+                Text(
+                    text = "Hisaboo",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary
+                )
+                Text(
+                    text = dateSubtitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(SurfaceGlass)
+                    .border(1.dp, BorderGlass, CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.VerifiedUser,
+                    contentDescription = "Admin",
+                    tint = AmberAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Admin",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceGlass)
+                    .border(1.dp, BorderGlass, CircleShape)
+                    .clickable { onOpenHub() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.GridView,
+                    contentDescription = "Hisaboo Hub",
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroWalletCard(
+    balance: Double,
+    cashIn: Double,
+    cashOut: Double,
+    connectedEmail: String?,
+    onBadgeClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .background(HeroWalletGradient)
+            .border(1.dp, HeroCardBorder, RoundedCornerShape(26.dp))
+            .padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "BALANCE • IN HAND",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp,
+                color = Color(0xFFD1FAE5)
+            )
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color(0x2603261C))
+                    .clickable { onBadgeClick() }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (connectedEmail != null) Icons.Rounded.CloudDone else Icons.Rounded.PhoneAndroid,
+                    contentDescription = null,
+                    tint = Color(0xFFECFDF5),
+                    modifier = Modifier.size(13.dp)
+                )
+                Text(
+                    text = if (connectedEmail != null) "Gmail Sync ON" else "Offline Saved",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFECFDF5)
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = formatRs(balance),
+                fontSize = 38.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                style = MaterialTheme.typography.displayLarge
+            )
+            Text(
+                text = "Available amount with you",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFA7F3D0)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(Color(0x6606231B))
+                    .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowDownward,
+                    contentDescription = "Cash In",
+                    tint = CashInGreen,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "IN: ${formatRs(cashIn)}",
+                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = CashInGreen,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(Color(0x6606231B))
+                    .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowUpward,
+                    contentDescription = "Cash Out",
+                    tint = CashOutRed,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "OUT: ${formatRs(cashOut)}",
+                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = CashOutRed,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionRow(
+    onCashIn: () -> Unit,
+    onCashOut: () -> Unit,
+    onBudget: () -> Unit,
+    onReport: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        QuickActionButton(
+            label = "+ Cash In",
+            icon = Icons.Rounded.Add,
+            tint = CashInGreen,
+            onClick = onCashIn
+        )
+        QuickActionButton(
+            label = "- Cash Out",
+            icon = Icons.Rounded.Remove,
+            tint = CashOutRed,
+            onClick = onCashOut
+        )
+        QuickActionButton(
+            label = "Budget",
+            icon = Icons.Rounded.PieChart,
+            tint = AmberAccent,
+            onClick = onBudget
+        )
+        QuickActionButton(
+            label = "Report",
+            icon = Icons.Rounded.BarChart,
+            tint = EmeraldPrimary,
+            onClick = onReport
         )
     }
 }
 
 @Composable
-private fun TransactionRowCard(
-    transaction: Transaction,
+private fun QuickActionButton(
+    label: String,
+    icon: ImageVector,
+    tint: Color,
     onClick: () -> Unit
 ) {
-    val isCashIn = transaction.type == TransactionType.CASH_IN
-    val accentColor = if (isCashIn) CashInGreen else CashOutRed
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceGlass)
-            .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clickable { onClick() }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.14f))
+                .border(1.dp, tint.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(accentColor.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
+        )
+    }
+}
+
+@Composable
+private fun DailyHadithCard(
+    hadith: DailyHadith,
+    selectedLang: HadithLanguage,
+    onSelectLang: (HadithLanguage) -> Unit
+) {
+    GlassCard(cornerRadius = 24.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = if (isCashIn) Icons.Rounded.SouthWest else Icons.Rounded.NorthEast,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(20.dp)
+                TintedIconBadge(
+                    icon = Icons.Rounded.FormatQuote,
+                    tint = EmeraldPrimary,
+                    size = 34.dp,
+                    iconSize = 18.dp,
+                    isCircle = true
+                )
+                Text(
+                    text = "Daily Hadith",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
                 )
             }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = transaction.categoryName,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (transaction.note.isNotBlank()) {
-                    Text(
-                        text = transaction.note,
-                        fontSize = 12.sp,
-                        color = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(SurfaceGlass)
+                    .border(1.dp, BorderGlass, CircleShape)
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                HadithLanguage.entries.forEach { lang ->
+                    val active = lang == selectedLang
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (active) EmeraldPrimary else Color.Transparent)
+                            .clickable { onSelectLang(lang) }
+                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = lang.label,
+                            fontSize = 11.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            color = if (active) OnEmeraldPrimary else TextSecondary
+                        )
+                    }
                 }
-                Text(
-                    text = transaction.date,
-                    fontSize = 11.sp,
-                    color = TextSecondary.copy(alpha = 0.75f)
-                )
             }
         }
 
+        Spacer(modifier = Modifier.height(14.dp))
+
+        val isRtl = selectedLang == HadithLanguage.URDU || selectedLang == HadithLanguage.ARABIC
+        val textContent = when (selectedLang) {
+            HadithLanguage.URDU -> hadith.urdu
+            HadithLanguage.ENGLISH -> hadith.english
+            HadithLanguage.ARABIC -> hadith.arabic
+        }
+
+        CompositionLocalProvider(
+            LocalLayoutDirection provides if (isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+        ) {
+            Text(
+                text = textContent,
+                fontSize = if (isRtl) 17.sp else 14.sp,
+                lineHeight = if (isRtl) 28.sp else 21.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimary,
+                textAlign = if (isRtl) TextAlign.Right else TextAlign.Left,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         Text(
-            text = (if (isCashIn) "+ " else "- ") + formatCurrency(transaction.amount),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = accentColor
+            text = hadith.reference,
+            style = MaterialTheme.typography.labelSmall,
+            color = EmeraldPrimary
         )
+    }
+}
+
+@Composable
+fun TransactionRowCard(
+    entry: TransactionEntry,
+    onDelete: () -> Unit
+) {
+    val (icon, tint) = getCategoryVisuals(entry.categoryName, entry.type)
+    val amountColor = if (entry.type == TransactionType.CASH_IN) CashInGreen else CashOutRed
+    val prefix = if (entry.type == TransactionType.CASH_IN) "+" else "-"
+
+    GlassCard(
+        cornerRadius = 20.dp,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                TintedIconBadge(icon = icon, tint = tint, size = 42.dp)
+                Column {
+                    Text(
+                        text = entry.note,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${entry.categoryName} • ${entry.date}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "$prefix${formatRs(entry.amount)}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = amountColor
+                )
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = "Delete",
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -485,7 +627,9 @@ private data class HubModuleItem(
 
 @Composable
 private fun HisabooHubSheetContent(
-    onSelectModule: (String) -> Unit
+    viewModel: HisabooViewModel,
+    onDismiss: () -> Unit,
+    onNavigate: (String) -> Unit
 ) {
     val modules = listOf(
         HubModuleItem("Monthly Report", Icons.Rounded.Assessment, EmeraldPrimary, HisabooRoutes.REPORT),
@@ -502,76 +646,189 @@ private fun HisabooHubSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Hisaboo Hub",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextPrimary
-            )
-            IconButton(onClick = { onSelectModule(HisabooRoutes.CHANGE_PIN) }) {
-                Icon(
-                    imageVector = Icons.Rounded.Lock,
-                    contentDescription = "Change PIN",
-                    tint = TextSecondary
-                )
-            }
-        }
+        Text(
+            text = "Hisaboo Hub",
+            style = MaterialTheme.typography.titleLarge,
+            color = TextPrimary
+        )
 
-        // Clean 4x2 Grid (8 items)
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             modules.chunked(4).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    rowItems.forEach { item ->
+                    rowItems.forEach { mod ->
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(BgObsidian.copy(alpha = 0.65f))
-                                .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
-                                .clickable { onSelectModule(item.route) }
-                                .padding(vertical = 14.dp, horizontal = 6.dp),
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(SurfaceGlass)
+                                .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+                                .clickable { onNavigate(mod.route) }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(item.tint.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.title,
-                                    tint = item.tint,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            TintedIconBadge(
+                                icon = mod.icon,
+                                tint = mod.tint,
+                                size = 38.dp,
+                                iconSize = 20.dp
+                            )
                             Text(
-                                text = item.title,
+                                text = mod.title,
                                 fontSize = 11.sp,
+                                lineHeight = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextPrimary,
-                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                    repeat(4 - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        GlassCard(
+            cornerRadius = 22.dp,
+            containerColor = SurfaceGlass,
+            contentPadding = PaddingValues(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TintedIconBadge(
+                        icon = Icons.Rounded.Fingerprint,
+                        tint = EmeraldPrimary,
+                        size = 36.dp,
+                        iconSize = 20.dp,
+                        isCircle = true
+                    )
+                    Text(
+                        text = "Fingerprint Lock",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary
+                    )
+                }
+
+                Switch(
+                    checked = viewModel.fingerprintEnabled,
+                    onCheckedChange = { viewModel.toggleFingerprint(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = OnEmeraldPrimary,
+                        checkedTrackColor = EmeraldPrimary,
+                        uncheckedThumbColor = TextSecondary,
+                        uncheckedTrackColor = SurfaceCard
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(SurfaceCard)
+                        .border(1.dp, BorderGlass, CircleShape)
+                        .clickable { onNavigate(HisabooRoutes.CHANGE_PIN) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Pin,
+                        contentDescription = null,
+                        tint = EmeraldPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Change PIN",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .clip(CircleShape)
+                        .background(SurfaceCard)
+                        .border(1.dp, BorderGlass, CircleShape)
+                        .clickable { viewModel.toggleLanguage() }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Language,
+                        contentDescription = null,
+                        tint = BlueAccent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Language: ${viewModel.appLanguage}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(CashOutTint)
+                        .border(1.dp, CashOutRed.copy(alpha = 0.4f), CircleShape)
+                        .clickable {
+                            onDismiss()
+                            viewModel.isAppLocked = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = "Lock App",
+                        tint = CashOutRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = "Made by Mian Zahid Sharif",
+            fontSize = 11.sp,
+            color = TextMuted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        )
     }
 }
