@@ -149,7 +149,7 @@ private fun StandardCalculatorSection() {
                 )
                 if (pendingOperator != null && firstOperand != null) {
                     Text(
-                        text = "${formatCalcNumber(firstOperand!!)}$pendingOperator",
+                        text = "${formatCalcNumber(firstOperand!!)} $pendingOperator",
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = TextSecondary
                     )
@@ -486,4 +486,309 @@ private fun UnitsConverterSection() {
                 UnitOption("Tola (11.664 g)", "tola", 11.6638038),
                 UnitOption("Gram (g)", "g", 1.0),
                 UnitOption("Masha (1/12 Tola)", "masha", 0.97198365),
-                UnitOption("Ratti (1/96 Tola)", "ratti",
+                UnitOption("Ratti (1/96 Tola)", "ratti", 0.12149796),
+                UnitOption("Milligram (mg)", "mg", 0.001),
+                UnitOption("Troy Ounce (oz t)", "oz t", 31.1034768),
+                UnitOption("Kilogram (kg)", "kg", 1000.0)
+            ),
+            // Base: Square Feet (sq ft)
+            "Area" to listOf(
+                UnitOption("Marla (272.25 sq ft)", "marla", 272.25),
+                UnitOption("Marla Lahore (225 sq ft)", "marla (225)", 225.0),
+                UnitOption("Kanal (20 Marla)", "kanal", 5445.0),
+                UnitOption("Square Feet (sq ft)", "sq ft", 1.0),
+                UnitOption("Square Yard / Gaz", "sq yd", 9.0),
+                UnitOption("Square Meter (sq m)", "sq m", 10.7639104),
+                UnitOption("Acre / Killa (8 Kanal)", "acre", 43560.0),
+                UnitOption("Murabba (25 Acre)", "murabba", 1089000.0)
+            ),
+            // Base: Liter (L)
+            "Volume" to listOf(
+                UnitOption("Liter (L)", "L", 1.0),
+                UnitOption("Milliliter (mL)", "mL", 0.001),
+                UnitOption("Gallon US (gal)", "gal (US)", 3.78541178),
+                UnitOption("Gallon UK (imp gal)", "gal (UK)", 4.54609),
+                UnitOption("Cubic Meter (m³)", "m³", 1000.0),
+                UnitOption("Cup (240 mL)", "cup", 0.24),
+                UnitOption("Fluid Ounce (fl oz)", "fl oz", 0.0295735)
+            ),
+            // Special handling for Temperature
+            "Temperature" to listOf(
+                UnitOption("Celsius (°C)", "°C", 1.0),
+                UnitOption("Fahrenheit (°F)", "°F", 1.0),
+                UnitOption("Kelvin (K)", "K", 1.0)
+            ),
+            // Base: Meter per second (m/s)
+            "Speed" to listOf(
+                UnitOption("Kilometers/hour (km/h)", "km/h", 0.27777778),
+                UnitOption("Miles/hour (mph)", "mph", 0.44704),
+                UnitOption("Meters/second (m/s)", "m/s", 1.0),
+                UnitOption("Knot (kn)", "kn", 0.514444)
+            ),
+            // Base: Megabyte (MB)
+            "Data" to listOf(
+                UnitOption("Byte (B)", "B", 1.0 / (1024.0 * 1024.0)),
+                UnitOption("Kilobyte (KB)", "KB", 1.0 / 1024.0),
+                UnitOption("Megabyte (MB)", "MB", 1.0),
+                UnitOption("Gigabyte (GB)", "GB", 1024.0),
+                UnitOption("Terabyte (TB)", "TB", 1024.0 * 1024.0)
+            ),
+            // Base: Second (sec)
+            "Time" to listOf(
+                UnitOption("Second (sec)", "sec", 1.0),
+                UnitOption("Minute (min)", "min", 60.0),
+                UnitOption("Hour (hr)", "hr", 3600.0),
+                UnitOption("Day", "day", 86400.0),
+                UnitOption("Week", "week", 604800.0),
+                UnitOption("Month (30 days)", "month", 2592000.0),
+                UnitOption("Year (365 days)", "year", 31536000.0)
+            )
+        )
+    }
+
+    var selectedCategory by remember { mutableStateOf("Length") }
+    val currentUnits = unitCatalog[selectedCategory] ?: emptyList()
+
+    var fromIndex by remember(selectedCategory) { mutableIntStateOf(0) }
+    var toIndex by remember(selectedCategory) { mutableIntStateOf(if (currentUnits.size > 1) 1 else 0) }
+    var inputValue by remember { mutableStateOf("1") }
+    var fromMenuExpanded by remember { mutableStateOf(false) }
+    var toMenuExpanded by remember { mutableStateOf(false) }
+
+    val fromUnit = currentUnits.getOrElse(fromIndex) { currentUnits.first() }
+    val toUnit = currentUnits.getOrElse(toIndex) { currentUnits.first() }
+
+    val numericVal = inputValue.toDoubleOrNull() ?: 0.0
+    val outputVal = if (selectedCategory == "Temperature") {
+        val celsius = when (fromUnit.symbol) {
+            "°F" -> (numericVal - 32.0) * 5.0 / 9.0
+            "K" -> numericVal - 273.15
+            else -> numericVal
+        }
+        when (toUnit.symbol) {
+            "°F" -> (celsius * 9.0 / 5.0) + 32.0
+            "K" -> celsius + 273.15
+            else -> celsius
+        }
+    } else {
+        val inBase = numericVal * fromUnit.toBaseFactor
+        if (toUnit.toBaseFactor > 0) inBase / toUnit.toBaseFactor else 0.0
+    }
+
+    val formattedOutput = remember(outputVal, toUnit.symbol) {
+        val cleanNum = if (outputVal == 0.0) {
+            "0"
+        } else if (kotlin.math.abs(outputVal) >= 1000.0) {
+            String.format(Locale.US, "%,.4f", outputVal).trimEnd('0').trimEnd('.')
+        } else {
+            String.format(Locale.US, "%.6f", outputVal).trimEnd('0').trimEnd('.')
+        }
+        "$cleanNum ${toUnit.symbol}"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            categoryNames.forEach { cat ->
+                val isSelected = cat == selectedCategory
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (isSelected) EmeraldPrimary else SurfaceGlass)
+                        .border(
+                            1.dp,
+                            if (isSelected) EmeraldPrimary else BorderGlass,
+                            CircleShape
+                        )
+                        .clickable { selectedCategory = cat }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = cat,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) OnEmeraldPrimary else TextPrimary
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassCard(cornerRadius = 22.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "FROM",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldPrimary
+                        )
+
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(SurfaceGlass)
+                                    .border(1.dp, BorderGlass, CircleShape)
+                                    .clickable { fromMenuExpanded = true }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = fromUnit.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = "Select From Unit",
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = fromMenuExpanded,
+                                onDismissRequest = { fromMenuExpanded = false },
+                                containerColor = SurfaceCard
+                            ) {
+                                currentUnits.forEachIndexed { idx, option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = option.label,
+                                                color = if (idx == fromIndex) EmeraldPrimary else TextPrimary,
+                                                fontWeight = if (idx == fromIndex) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            fromIndex = idx
+                                            fromMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    HisabooTextField(
+                        value = inputValue,
+                        onValueChange = { inputValue = it },
+                        label = "Enter value in ${fromUnit.symbol}",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                }
+
+                GlassCard(
+                    cornerRadius = 22.dp,
+                    containerColor = SurfaceGlass
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "CONVERTED RESULT",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary
+                        )
+
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(SurfaceCard)
+                                    .border(1.dp, BorderGlass, CircleShape)
+                                    .clickable { toMenuExpanded = true }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = toUnit.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = EmeraldPrimary
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = "Select To Unit",
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = toMenuExpanded,
+                                onDismissRequest = { toMenuExpanded = false },
+                                containerColor = SurfaceCard
+                            ) {
+                                currentUnits.forEachIndexed { idx, option ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = option.label,
+                                                color = if (idx == toIndex) EmeraldPrimary else TextPrimary,
+                                                fontWeight = if (idx == toIndex) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            toIndex = idx
+                                            toMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = formattedOutput,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CashInGreen,
+                        style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum")
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldPrimary)
+                    .border(3.dp, BgObsidian, CircleShape)
+                    .clickable {
+                        val temp = fromIndex
+                        fromIndex = toIndex
+                        toIndex = temp
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SwapVert,
+                    contentDescription = "Swap Units",
+                    tint = OnEmeraldPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
