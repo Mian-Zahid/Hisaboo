@@ -13,11 +13,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.mianzahid.expenseentry.R
+
+// Jameel Noori Nastaliq Font Family for Urdu Text
+val JameelNooriNastaliq = FontFamily(
+    Font(R.font.jameel_noori_nastaliq, FontWeight.Normal),
+    Font(R.font.jameel_noori_nastaliq, FontWeight.Medium),
+    Font(R.font.jameel_noori_nastaliq, FontWeight.SemiBold),
+    Font(R.font.jameel_noori_nastaliq, FontWeight.Bold)
+)
 
 // Core Dark Obsidian & Emerald FinTech Palette
 val BgObsidian = Color(0xFF090E0C)
