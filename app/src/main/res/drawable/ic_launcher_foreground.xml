@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="13.5"
+        android:translateY="13.5">
+        <!-- Emerald Balance Link (Left & Up-flow) -->
+        <path
+            android:strokeColor="#10B981"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M 32,18 L 18,32 C 10,40 10,54 18,62 L 32,76 C 40,84 54,84 62,76 L 68,70" />
+
+        <!-- Gold Cash-Flow Link (Right & Down-flow Interlocking) -->
+        <path
+            android:strokeColor="#FBBF24"
+            android:strokeWidth="7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M 50,70 L 62,62 C 70,54 70,40 62,32 L 50,18 C 42,10 28,10 20,18 L 14,24" />
+
+        <!-- Subtle Gradient Highlight/Joint dot -->
+        <path
+            android:fillColor="#FBBF24"
+            android:pathData="M37,42 C35,40 35,37 37,35 C39,33 42,33 44,35" />
+    </group>
+</vector>
