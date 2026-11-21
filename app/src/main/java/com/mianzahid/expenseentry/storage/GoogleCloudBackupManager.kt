@@ -11,15 +11,12 @@ import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * Handles Google Sign-In + automatic hidden Google Drive AppData backup & auto-restore
- * (same mechanism used by WhatsApp / Google Contacts backups).
- */
 class GoogleCloudBackupManager(private val context: Context) {
 
     companion object {
@@ -68,7 +65,6 @@ class GoogleCloudBackupManager(private val context: Context) {
                 val existingFileId = findExistingBackupFileId(token)
 
                 if (existingFileId != null) {
-                    // Update existing AppData backup file
                     val url = URL("https://www.googleapis.com/upload/drive/v3/files/$existingFileId?uploadType=media")
                     val conn = (url.openConnection() as HttpURLConnection).apply {
                         requestMethod = "PATCH"
@@ -84,7 +80,6 @@ class GoogleCloudBackupManager(private val context: Context) {
                         Result.failure(Exception("Cloud upload HTTP $code"))
                     }
                 } else {
-                    // Create new multipart file inside hidden appDataFolder
                     val boundary = "hisaboo_boundary_${System.currentTimeMillis()}"
                     val url = URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
                     val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -96,27 +91,17 @@ class GoogleCloudBackupManager(private val context: Context) {
 
                     val metadata = JSONObject().apply {
                         put("name", BACKUP_FILE_NAME)
-                        put("parents", org.json.JSONArray().put("appDataFolder"))
+                        put("parents", JSONArray().put("appDataFolder"))
                     }.toString()
 
-                    val body = buildString {
-                        append("--$boundary
-")
-                        append("Content-Type: application/json; charset=UTF-8
-
-")
-                        append(metadata)
-                        append("
---$boundary
-")
-                        append("Content-Type: application/json; charset=UTF-8
-
-")
-                        append(jsonContent)
-                        append("
---$boundary--
-")
-                    }
+                    val crlf = "\r\n"
+                    val body = "--$boundary$crlf" +
+                        "Content-Type: application/json; charset=UTF-8$crlf$crlf" +
+                        "$metadata$crlf" +
+                        "--$boundary$crlf" +
+                        "Content-Type: application/json; charset=UTF-8$crlf$crlf" +
+                        "$jsonContent$crlf" +
+                        "--$boundary--$crlf"
 
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body) }
                     val code = conn.responseCode
