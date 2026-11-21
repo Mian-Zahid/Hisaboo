@@ -1,0 +1,618 @@
+package com.mianzahid.expenseentry.viewmodel
+
+import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.mianzahid.expenseentry.model.*
+import com.mianzahid.expenseentry.storage.GoogleCloudBackupManager
+import com.mianzahid.expenseentry.storage.HisabooStorage
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
+
+class HisabooViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val storage = HisabooStorage(application.applicationContext)
+    val cloudManager = GoogleCloudBackupManager(application.applicationContext)
+
+    // Categories
+    val categories = mutableStateListOf<CategoryItem>()
+
+    // Transactions
+    val transactions = mutableStateListOf<TransactionEntry>()
+
+    // Budgets per category
+    val categoryBudgets = mutableStateMapOf<String, Double>()
+
+    // Sub-modules state
+    val plannedPayments = mutableStateListOf<PlannedPaymentItem>()
+    val reminders = mutableStateListOf<ReminderItem>()
+    val loans = mutableStateListOf<LoanItem>()
+    val utilityBills = mutableStateListOf<UtilityBillItem>()
+    val familyMembers = mutableStateListOf<FamilyMemberItem>()
+    var inviteCode by mutableStateOf<String?>(null)
+
+    // Security & Settings
+    var fingerprintEnabled by mutableStateOf(false)
+    var appLanguage by mutableStateOf("English")
+    var isAppLocked by mutableStateOf(false)
+    var currentPin by mutableStateOf("1234")
+    var lastBackupText by mutableStateOf("Never")
+    var usdToPkrRate by mutableDoubleStateOf(278.50)
+
+    // Gmail / Google Cloud Sync State
+    var connectedGoogleEmail by mutableStateOf<String?>(null)
+    var autoCloudSyncEnabled by mutableStateOf(true)
+    var isCloudSyncing by mutableStateOf(false)
+    var cloudStatusBanner by mutableStateOf<String?>(null)
+
+    // Hadith State
+    var selectedHadithLang by mutableStateOf(HadithLanguage.ENGLISH)
+    val dailyHadith = DailyHadith(
+        arabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
+        urdu = "اعمال کا دارومدار نیتوں پر ہے اور ہر شخص کو وہی ملے گا جس کی اس نے نیت کی۔",
+        english = "Actions are judged by intentions, and every person will get the reward according to what they intended.",
+        reference = "Sahih al-Bukhari 1"
+    )
+
+    init {
+        val savedJson = storage.loadRawJson()
+        if (savedJson != null) {
+            restoreFromJson(savedJson)
+        } else {
+            loadDefaultCategories()
+            persistState(triggerCloudSync = false)
+        }
+
+        // Check if user was already signed in with Gmail/Google
+        val lastAccount = cloudManager.getLastSignedInAccount()
+        if (lastAccount != null && !lastAccount.email.isNullOrBlank()) {
+            connectedGoogleEmail = lastAccount.email
+            // If fresh install (no transactions yet) & signed in, auto-restore from cloud!
+            if (transactions.isEmpty()) {
+                autoRestoreFromCloudIfAvailable(lastAccount)
+            }
+        }
+    }
+
+    private fun loadDefaultCategories() {
+        categories.clear()
+        categories.addAll(
+            listOf(
+                CategoryItem("cat_business", "Business", TransactionType.CASH_IN, "business"),
+                CategoryItem("cat_other_in", "Other Income", TransactionType.CASH_IN, "other_income"),
+                CategoryItem("cat_salary", "Salary", TransactionType.CASH_IN, "salary"),
+                CategoryItem("cat_bills", "Bills", TransactionType.CASH_OUT, "bills"),
+                CategoryItem("cat_food", "Food", TransactionType.CASH_OUT, "food"),
+                CategoryItem("cat_other_out", "Other Expense", TransactionType.CASH_OUT, "other_expense"),
+                CategoryItem("cat_rent", "Rent", TransactionType.CASH_OUT, "rent"),
+                CategoryItem("cat_shopping", "Shopping", TransactionType.CASH_OUT, "shopping"),
+                CategoryItem("cat_transport", "Transport", TransactionType.CASH_OUT, "transport")
+            )
+        )
+    }
+
+    private fun persistState(triggerCloudSync: Boolean = true) {
+        storage.saveAll(
+            categories = categories.toList(),
+            transactions = transactions.toList(),
+            budgets = categoryBudgets.toMap(),
+            plannedPayments = plannedPayments.toList(),
+            reminders = reminders.toList(),
+            loans = loans.toList(),
+            utilityBills = utilityBills.toList(),
+            familyMembers = familyMembers.toList(),
+            inviteCode = inviteCode,
+            fingerprintEnabled = fingerprintEnabled,
+            appLanguage = appLanguage,
+            currentPin = currentPin,
+            lastBackupText = lastBackupText,
+            usdToPkrRate = usdToPkrRate,
+            connectedEmail = connectedGoogleEmail,
+            autoCloudSyncEnabled = autoCloudSyncEnabled
+        )
+
+        // If user is logged into Gmail/Google & Auto-Sync is ON, auto-backup in background
+        if (triggerCloudSync && autoCloudSyncEnabled && !connectedGoogleEmail.isNullOrBlank()) {
+            val account = cloudManager.getLastSignedInAccount() ?: return
+            val jsonSnapshot = buildCurrentJsonString(pretty = false)
+            viewModelScope.launch {
+                val res = cloudManager.uploadBackupToCloud(account, jsonSnapshot)
+                if (res.isSuccess) {
+                    val time = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date())
+                    lastBackupText = "$time (Gmail Cloud)"
+                    storage.saveAll(
+                        categories.toList(), transactions.toList(), categoryBudgets.toMap(),
+                        plannedPayments.toList(), reminders.toList(), loans.toList(),
+                        utilityBills.toList(), familyMembers.toList(), inviteCode,
+                        fingerprintEnabled, appLanguage, currentPin, lastBackupText,
+                        usdToPkrRate, connectedGoogleEmail, autoCloudSyncEnabled
+                    )
+                }
+            }
+        }
+    }
+
+    private fun buildCurrentJsonString(pretty: Boolean = true): String {
+        val obj = storage.serializeToJson(
+            categories, transactions, categoryBudgets, plannedPayments,
+            reminders, loans, utilityBills, familyMembers,
+            inviteCode, fingerprintEnabled, appLanguage,
+            currentPin, lastBackupText, usdToPkrRate
+        )
+        return if (pretty) obj.toString(2) else obj.toString()
+    }
+
+    private fun restoreFromJson(root: JSONObject) {
+        try {
+            val catArr = root.optJSONArray("categories")
+            if (catArr != null && catArr.length() > 0) {
+                categories.clear()
+                for (i in 0 until catArr.length()) {
+                    val o = catArr.getJSONObject(i)
+                    categories.add(
+                        CategoryItem(
+                            id = o.getString("id"),
+                            name = o.getString("name"),
+                            type = TransactionType.valueOf(o.getString("type")),
+                            iconName = o.optString("iconName", "bills"),
+                            isDefault = o.optBoolean("isDefault", true)
+                        )
+                    )
+                }
+            } else {
+                loadDefaultCategories()
+            }
+
+            transactions.clear()
+            val txArr = root.optJSONArray("transactions")
+            if (txArr != null) {
+                for (i in 0 until txArr.length()) {
+                    val o = txArr.getJSONObject(i)
+                    transactions.add(
+                        TransactionEntry(
+                            id = o.getString("id"),
+                            categoryId = o.getString("categoryId"),
+                            categoryName = o.getString("categoryName"),
+                            amount = o.getDouble("amount"),
+                            note = o.getString("note"),
+                            date = o.getString("date"),
+                            type = TransactionType.valueOf(o.getString("type"))
+                        )
+                    )
+                }
+            }
+
+            categoryBudgets.clear()
+            val budgetObj = root.optJSONObject("budgets")
+            if (budgetObj != null) {
+                val keys = budgetObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    categoryBudgets[k] = budgetObj.getDouble(k)
+                }
+            }
+
+            plannedPayments.clear()
+            val planArr = root.optJSONArray("plannedPayments")
+            if (planArr != null) {
+                for (i in 0 until planArr.length()) {
+                    val o = planArr.getJSONObject(i)
+                    plannedPayments.add(
+                        PlannedPaymentItem(
+                            id = o.getString("id"),
+                            amount = o.getDouble("amount"),
+                            note = o.getString("note"),
+                            dayOfMonth = o.getInt("dayOfMonth"),
+                            categoryName = o.getString("categoryName")
+                        )
+                    )
+                }
+            }
+
+            reminders.clear()
+            val remArr = root.optJSONArray("reminders")
+            if (remArr != null) {
+                for (i in 0 until remArr.length()) {
+                    val o = remArr.getJSONObject(i)
+                    reminders.add(
+                        ReminderItem(
+                            id = o.getString("id"),
+                            title = o.getString("title"),
+                            dueDate = o.getString("dueDate"),
+                            isCompleted = o.optBoolean("isCompleted", false)
+                        )
+                    )
+                }
+            }
+
+            loans.clear()
+            val loanArr = root.optJSONArray("loans")
+            if (loanArr != null) {
+                for (i in 0 until loanArr.length()) {
+                    val o = loanArr.getJSONObject(i)
+                    loans.add(
+                        LoanItem(
+                            id = o.getString("id"),
+                            person = o.getString("person"),
+                            amount = o.getDouble("amount"),
+                            isToReceive = o.getBoolean("isToReceive")
+                        )
+                    )
+                }
+            }
+
+            utilityBills.clear()
+            val billArr = root.optJSONArray("utilityBills")
+            if (billArr != null) {
+                for (i in 0 until billArr.length()) {
+                    val o = billArr.getJSONObject(i)
+                    utilityBills.add(
+                        UtilityBillItem(
+                            id = o.getString("id"),
+                            title = o.getString("title"),
+                            provider = o.getString("provider"),
+                            amount = o.getDouble("amount"),
+                            dueDate = o.getString("dueDate")
+                        )
+                    )
+                }
+            }
+
+            familyMembers.clear()
+            val famArr = root.optJSONArray("familyMembers")
+            if (famArr != null) {
+                for (i in 0 until famArr.length()) {
+                    val o = famArr.getJSONObject(i)
+                    familyMembers.add(
+                        FamilyMemberItem(
+                            id = o.getString("id"),
+                            name = o.getString("name"),
+                            pin = o.getString("pin")
+                        )
+                    )
+                }
+            }
+
+            val code = root.optString("inviteCode", "")
+            inviteCode = code.ifBlank { null }
+            fingerprintEnabled = root.optBoolean("fingerprintEnabled", false)
+            appLanguage = root.optString("appLanguage", "English")
+            currentPin = root.optString("currentPin", "1234")
+            lastBackupText = root.optString("lastBackupText", "Never")
+            usdToPkrRate = root.optDouble("usdToPkrRate", 278.50)
+
+            val savedEmail = root.optString("connectedEmail", "")
+            if (savedEmail.isNotBlank()) connectedGoogleEmail = savedEmail
+            autoCloudSyncEnabled = root.optBoolean("autoCloudSyncEnabled", true)
+
+            if (fingerprintEnabled) {
+                isAppLocked = true
+            }
+        } catch (_: Exception) {
+            if (categories.isEmpty()) loadDefaultCategories()
+        }
+    }
+
+    // Called when user logs into Gmail / Google Account inside the app
+    fun onGoogleSignInSuccess(account: GoogleSignInAccount) {
+        connectedGoogleEmail = account.email
+        persistState(triggerCloudSync = false)
+        autoRestoreFromCloudIfAvailable(account)
+    }
+
+    private fun autoRestoreFromCloudIfAvailable(account: GoogleSignInAccount) {
+        viewModelScope.launch {
+            isCloudSyncing = true
+            cloudStatusBanner = "Checking Gmail cloud backup for ${account.email}..."
+            val downloadResult = cloudManager.downloadBackupFromCloud(account)
+            if (downloadResult.isSuccess) {
+                val cloudJson = downloadResult.getOrNull()
+                if (cloudJson != null) {
+                    // If local phone is empty, auto-restore immediately like Google Contacts!
+                    if (transactions.isEmpty()) {
+                        restoreFromJson(cloudJson)
+                        persistState(triggerCloudSync = false)
+                        cloudStatusBanner = "Auto-restored ledger from ${account.email}"
+                    } else {
+                        // Local already has data -> upload latest local state to cloud
+                        cloudManager.uploadBackupToCloud(account, buildCurrentJsonString(false))
+                        cloudStatusBanner = "Connected & synced with ${account.email}"
+                    }
+                }
+            } else {
+                // First time connecting this Gmail -> upload initial backup
+                val uploadRes = cloudManager.uploadBackupToCloud(account, buildCurrentJsonString(false))
+                cloudStatusBanner = if (uploadRes.isSuccess) {
+                    val time = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date())
+                    lastBackupText = "$time (Gmail Cloud)"
+                    persistState(triggerCloudSync = false)
+                    "Connected! Auto-backup active for ${account.email}"
+                } else {
+                    "Connected ${account.email} (Offline / Local backup active)"
+                }
+            }
+            isCloudSyncing = false
+        }
+    }
+
+    fun manualCloudBackupNow() {
+        val account = cloudManager.getLastSignedInAccount()
+        if (account == null) {
+            cloudStatusBanner = "Please connect your Gmail account first."
+            return
+        }
+        viewModelScope.launch {
+            isCloudSyncing = true
+            val res = cloudManager.uploadBackupToCloud(account, buildCurrentJsonString(false))
+            cloudStatusBanner = if (res.isSuccess) {
+                val time = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date())
+                lastBackupText = "$time (Gmail Cloud)"
+                persistState(triggerCloudSync = false)
+                "Backup uploaded to ${account.email}"
+            } else {
+                res.exceptionOrNull()?.message ?: "Cloud upload failed. Local backup saved."
+            }
+            isCloudSyncing = false
+        }
+    }
+
+    fun manualCloudRestoreNow() {
+        val account = cloudManager.getLastSignedInAccount()
+        if (account == null) {
+            cloudStatusBanner = "Please connect your Gmail account first."
+            return
+        }
+        viewModelScope.launch {
+            isCloudSyncing = true
+            val res = cloudManager.downloadBackupFromCloud(account)
+            cloudStatusBanner = if (res.isSuccess && res.getOrNull() != null) {
+                restoreFromJson(res.getOrNull()!!)
+                persistState(triggerCloudSync = false)
+                "Restored all records from ${account.email}"
+            } else {
+                res.exceptionOrNull()?.message ?: "No cloud backup found."
+            }
+            isCloudSyncing = false
+        }
+    }
+
+    fun disconnectGoogleAccount() {
+        viewModelScope.launch {
+            cloudManager.signOut()
+            connectedGoogleEmail = null
+            cloudStatusBanner = "Disconnected Gmail account. Offline auto-save active."
+            persistState(triggerCloudSync = false)
+        }
+    }
+
+    fun toggleAutoCloudSync(enabled: Boolean) {
+        autoCloudSyncEnabled = enabled
+        persistState(triggerCloudSync = enabled)
+    }
+
+    // Computed Balances
+    val totalCashIn: Double
+        get() = transactions.filter { it.type == TransactionType.CASH_IN }.sumOf { it.amount }
+
+    val totalCashOut: Double
+        get() = transactions.filter { it.type == TransactionType.CASH_OUT }.sumOf { it.amount }
+
+    val balanceInHand: Double
+        get() = totalCashIn - totalCashOut
+
+    fun todayFormatted(): String {
+        return SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date())
+    }
+
+    fun addTransaction(
+        categoryId: String,
+        categoryName: String,
+        amount: Double,
+        note: String,
+        date: String,
+        type: TransactionType
+    ) {
+        if (amount <= 0) return
+        transactions.add(
+            0,
+            TransactionEntry(
+                id = UUID.randomUUID().toString(),
+                categoryId = categoryId,
+                categoryName = categoryName,
+                amount = amount,
+                note = note.ifBlank { categoryName },
+                date = date.ifBlank { todayFormatted() },
+                type = type
+            )
+        )
+        persistState()
+    }
+
+    fun deleteTransaction(id: String) {
+        transactions.removeAll { it.id == id }
+        persistState()
+    }
+
+    fun addCategory(name: String, type: TransactionType) {
+        if (name.isBlank()) return
+        categories.add(
+            CategoryItem(
+                id = "cat_${UUID.randomUUID()}",
+                name = name.trim(),
+                type = type,
+                iconName = name.trim().lowercase(),
+                isDefault = false
+            )
+        )
+        persistState()
+    }
+
+    fun deleteCategory(categoryId: String) {
+        categories.removeAll { it.id == categoryId }
+        transactions.removeAll { it.categoryId == categoryId }
+        categoryBudgets.remove(categoryId)
+        persistState()
+    }
+
+    fun setBudgetForCategory(categoryId: String, amount: Double) {
+        if (amount > 0) {
+            categoryBudgets[categoryId] = amount
+        } else {
+            categoryBudgets.remove(categoryId)
+        }
+        persistState()
+    }
+
+    fun addPlannedPayment(amount: Double, note: String, day: Int, categoryName: String) {
+        if (amount <= 0) return
+        plannedPayments.add(
+            PlannedPaymentItem(
+                id = UUID.randomUUID().toString(),
+                amount = amount,
+                note = note.ifBlank { "Scheduled Payment" },
+                dayOfMonth = day.coerceIn(1, 28),
+                categoryName = categoryName
+            )
+        )
+        persistState()
+    }
+
+    fun addReminder(title: String, date: String) {
+        if (title.isBlank()) return
+        reminders.add(
+            ReminderItem(
+                id = UUID.randomUUID().toString(),
+                title = title.trim(),
+                dueDate = date.ifBlank { todayFormatted() }
+            )
+        )
+        persistState()
+    }
+
+    fun addLoan(person: String, amount: Double, isToReceive: Boolean) {
+        if (person.isBlank() || amount <= 0) return
+        loans.add(
+            LoanItem(
+                id = UUID.randomUUID().toString(),
+                person = person.trim(),
+                amount = amount,
+                isToReceive = isToReceive
+            )
+        )
+        persistState()
+    }
+
+    fun addUtilityBill(title: String, provider: String, amount: Double, dueDate: String) {
+        if (title.isBlank() || amount <= 0) return
+        utilityBills.add(
+            UtilityBillItem(
+                id = UUID.randomUUID().toString(),
+                title = title.trim(),
+                provider = provider,
+                amount = amount,
+                dueDate = dueDate.ifBlank { todayFormatted() }
+            )
+        )
+        persistState()
+    }
+
+    fun generateInviteCode() {
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        inviteCode = "HSB-" + (1..6).map { chars.random() }.joinToString("")
+        persistState()
+    }
+
+    fun addFamilyMember(name: String, pin: String) {
+        if (name.isBlank() || pin.isBlank()) return
+        familyMembers.add(
+            FamilyMemberItem(
+                id = UUID.randomUUID().toString(),
+                name = name.trim(),
+                pin = pin.trim()
+            )
+        )
+        persistState()
+    }
+
+    fun toggleFingerprint(enabled: Boolean) {
+        fingerprintEnabled = enabled
+        persistState()
+    }
+
+    fun toggleLanguage() {
+        appLanguage = if (appLanguage == "English") "اردو" else "English"
+        persistState()
+    }
+
+    fun updatePin(newPin: String) {
+        currentPin = newPin
+        persistState()
+    }
+
+    fun updateUsdRate(newRate: Double) {
+        if (newRate > 0) {
+            usdToPkrRate = newRate
+            persistState()
+        }
+    }
+
+    // Local & File Backup / Restore Actions
+    fun backupNow(): String {
+        val json = buildCurrentJsonString(pretty = false)
+        val time = storage.saveManualSnapshot(json)
+        lastBackupText = time
+        persistState(triggerCloudSync = true)
+        return "Local backup saved ($time)"
+    }
+
+    fun downloadBackupFile(): String {
+        return storage.exportBackupToDownloads(buildCurrentJsonString(pretty = true))
+    }
+
+    fun restoreSavedBackup(): String {
+        val snap = storage.loadManualSnapshot() ?: return "No saved local backup found yet."
+        restoreFromJson(snap.first)
+        persistState(triggerCloudSync = false)
+        return "Restored backup from ${snap.second}"
+    }
+
+    fun restoreFromDownloadsFile(): String {
+        val imported = storage.importBackupFromDownloads()
+            ?: return "No Hisaboo_Backup.json found in Downloads."
+        restoreFromJson(imported)
+        persistState(triggerCloudSync = false)
+        return "Restored ledger from Hisaboo_Backup.json"
+    }
+
+    fun restoreFromUri(uri: Uri): String {
+        val imported = storage.readJsonFromUri(uri)
+            ?: return "Invalid backup file selected."
+        restoreFromJson(imported)
+        persistState(triggerCloudSync = false)
+        return "Restored all records from selected backup file!"
+    }
+
+    fun createGmailShareIntent(): Intent {
+        return storage.buildSendToGmailIntent(
+            jsonString = buildCurrentJsonString(pretty = true),
+            targetEmail = connectedGoogleEmail
+        )
+    }
+
+    fun exportExcelCsv(): String {
+        return storage.exportCsvToDownloads(transactions.toList())
+    }
+}
