@@ -3,6 +3,7 @@ package com.mianzahid.expenseentry.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Sync
@@ -29,8 +31,6 @@ import com.mianzahid.expenseentry.ui.components.HisabooTextField
 import com.mianzahid.expenseentry.ui.components.PillSegmentedSwitcher
 import com.mianzahid.expenseentry.ui.theme.*
 import com.mianzahid.expenseentry.viewmodel.HisabooViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -149,7 +149,7 @@ private fun StandardCalculatorSection() {
                 )
                 if (pendingOperator != null && firstOperand != null) {
                     Text(
-                        text = "${formatCalcNumber(firstOperand!!)} $pendingOperator",
+                        text = "${formatCalcNumber(firstOperand!!)}$pendingOperator",
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = TextSecondary
                     )
@@ -248,8 +248,7 @@ private fun StandardCalculatorSection() {
 private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
     val usdToPkrRate = viewModel.usdToPkrRate
     var isUsdToPkr by remember { mutableStateOf(true) }
-    var inputAmount by remember { mutableStateOf("") }
-    var lastUpdated by remember { mutableStateOf("21 Nov 2026 17:38") }
+    var inputAmount by remember { mutableStateOf("1") }
     var showEditRateDialog by remember { mutableStateOf(false) }
 
     val fromCode = if (isUsdToPkr) "USD" else "PKR"
@@ -260,7 +259,8 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
     } else {
         if (usdToPkrRate > 0) numericInput / usdToPkrRate else 0.0
     }
-    val formattedResult = String.format(Locale.US, "%.2f %s", converted, toCode)
+    val formattedResult = String.format(Locale.US, "%,.2f %s", converted, toCode)
+    val isLive = viewModel.rateStatusText.startsWith("Live updated")
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
@@ -271,12 +271,12 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(AmberAccent)
+                    .background(if (isLive) CashInGreen else AmberAccent)
             )
             Text(
-                text = "Offline • Last updated: $lastUpdated",
+                text = viewModel.rateStatusText,
                 style = MaterialTheme.typography.labelMedium,
-                color = TextSecondary
+                color = if (isLive) CashInGreen else TextSecondary
             )
         }
 
@@ -354,21 +354,30 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
-                onClick = {
-                    lastUpdated = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.US).format(Date())
-                },
+                onClick = { viewModel.fetchLiveUsdRate() },
+                enabled = !viewModel.isFetchingRate,
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = EmeraldPrimary,
                     contentColor = OnEmeraldPrimary
                 ),
                 modifier = Modifier
-                    .weight(1.3f)
+                    .weight(1.35f)
                     .height(48.dp)
             ) {
-                Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Update Rates Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                if (viewModel.isFetchingRate) {
+                    CircularProgressIndicator(
+                        color = OnEmeraldPrimary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Updating...", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                } else {
+                    Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Update Rates Now", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
 
             OutlinedButton(
@@ -385,13 +394,13 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
             ) {
                 Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Edit Rates", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text("Edit Rate", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
         }
     }
 
     if (showEditRateDialog) {
-        var rateInput by remember { mutableStateOf(usdToPkrRate.toString()) }
+        var rateInput by remember { mutableStateOf(String.format(Locale.US, "%.2f", usdToPkrRate)) }
         Dialog(onDismissRequest = { showEditRateDialog = false }) {
             GlassCard(cornerRadius = 24.dp) {
                 Text("Edit USD to PKR Rate", style = MaterialTheme.typography.titleLarge)
@@ -409,7 +418,10 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
                     }
                     Button(
                         onClick = {
-                            rateInput.toDoubleOrNull()?.let { viewModel.updateUsdRate(it) }
+                            rateInput.toDoubleOrNull()?.let {
+                                viewModel.updateUsdRate(it)
+                                viewModel.rateStatusText = "Manual rate set"
+                            }
                             showEditRateDialog = false
                         },
                         shape = CircleShape,
@@ -426,98 +438,52 @@ private fun CurrencyConverterSection(viewModel: HisabooViewModel) {
     }
 }
 
+private data class UnitOption(
+    val label: String,
+    val symbol: String,
+    val toBaseFactor: Double
+)
+
 @Composable
 private fun UnitsConverterSection() {
-    val categories = listOf("Length", "Weight", "Area")
-    var categoryIndex by remember { mutableIntStateOf(0) }
-    var isForward by remember { mutableStateOf(true) }
-    var inputValue by remember { mutableStateOf("") }
+    val categoryNames = listOf(
+        "Length",
+        "Weight",
+        "Gold",
+        "Area",
+        "Volume",
+        "Temperature",
+        "Speed",
+        "Data",
+        "Time"
+    )
 
-    val selectedCategory = categories[categoryIndex]
-    val (unitA, unitB, factor) = when (selectedCategory) {
-        "Weight" -> Triple("kg", "g", 1000.0)
-        "Area" -> Triple("marla", "sq ft", 272.25)
-        else -> Triple("m", "km", 0.001)
-    }
-
-    val fromUnit = if (isForward) unitA else unitB
-    val toUnit = if (isForward) unitB else unitA
-    val numericVal = inputValue.toDoubleOrNull() ?: 0.0
-    val outputVal = if (isForward) numericVal * factor else numericVal / factor
-    val formattedOutput = String.format(Locale.US, "%.4f %s", outputVal, toUnit)
-
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(SurfaceGlass)
-                .border(1.dp, BorderGlass, CircleShape)
-                .clickable { categoryIndex = (categoryIndex + 1) % categories.size }
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = "Category: $selectedCategory",
-                style = MaterialTheme.typography.labelLarge,
-                color = EmeraldPrimary
-            )
-        }
-
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                GlassCard(cornerRadius = 22.dp) {
-                    Text(
-                        text = "INPUT ($fromUnit)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldPrimary
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HisabooTextField(
-                        value = inputValue,
-                        onValueChange = { inputValue = it },
-                        label = "Enter value in $fromUnit",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
-                }
-
-                GlassCard(
-                    cornerRadius = 22.dp,
-                    containerColor = SurfaceGlass
-                ) {
-                    Text(
-                        text = "RESULT ($toUnit)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = formattedOutput,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = CashInGreen,
-                        style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum")
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(EmeraldPrimary)
-                    .border(3.dp, BgObsidian, CircleShape)
-                    .clickable { isForward = !isForward },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.SwapVert,
-                    contentDescription = "Swap Units",
-                    tint = OnEmeraldPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-    }
-}
+    val unitCatalog: Map<String, List<UnitOption>> = remember {
+        mapOf(
+            // Base: Meter (m)
+            "Length" to listOf(
+                UnitOption("Meter (m)", "m", 1.0),
+                UnitOption("Kilometer (km)", "km", 1000.0),
+                UnitOption("Centimeter (cm)", "cm", 0.01),
+                UnitOption("Millimeter (mm)", "mm", 0.001),
+                UnitOption("Inch (in)", "in", 0.0254),
+                UnitOption("Foot (ft)", "ft", 0.3048),
+                UnitOption("Yard / Gaz (yd)", "yd", 0.9144),
+                UnitOption("Mile (mi)", "mi", 1609.344)
+            ),
+            // Base: Kilogram (kg)
+            "Weight" to listOf(
+                UnitOption("Kilogram (kg)", "kg", 1.0),
+                UnitOption("Gram (g)", "g", 0.001),
+                UnitOption("Milligram (mg)", "mg", 0.000001),
+                UnitOption("Maund / Mann (40 kg)", "maund", 40.0),
+                UnitOption("Pound (lb)", "lb", 0.45359237),
+                UnitOption("Ounce (oz)", "oz", 0.02834952),
+                UnitOption("Metric Ton (t)", "ton", 1000.0)
+            ),
+            // Base: Gram (g) — Pakistan Sarafa Gold Standard (1 Tola = 11.664g = 12 Masha = 96 Ratti)
+            "Gold" to listOf(
+                UnitOption("Tola (11.664 g)", "tola", 11.6638038),
+                UnitOption("Gram (g)", "g", 1.0),
+                UnitOption("Masha (1/12 Tola)", "masha", 0.97198365),
+                UnitOption("Ratti (1/96 Tola)", "ratti",
