@@ -1,15 +1,12 @@
 package com.mianzahid.expenseentry.ui.screens
 
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -18,176 +15,35 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.common.api.ApiException
+import com.mianzahid.expenseentry.model.formatRs
 import com.mianzahid.expenseentry.ui.components.*
 import com.mianzahid.expenseentry.ui.theme.*
 import com.mianzahid.expenseentry.viewmodel.HisabooViewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun FamilyScreen(
+fun PlannedPaymentsScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
-    var memberName by remember { mutableStateOf("") }
-    var memberPin by remember { mutableStateOf("") }
+    val categoryPills = listOf(
+        "Bills", "Food", "Other Expense", "Rent",
+        "Shopping", "Transport", "Business", "Other Income", "Salary"
+    )
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    var dayDate by remember { mutableStateOf("") }
+    var selectedCat by remember { mutableStateOf("Bills") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Family", onBack = onBack)
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                GlassCard(cornerRadius = 22.dp) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        TintedIconBadge(
-                            icon = Icons.Rounded.Groups,
-                            tint = BlueAccent,
-                            size = 40.dp,
-                            isCircle = true
-                        )
-                        Column {
-                            Text("Family Workspace", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = if (viewModel.familyMembers.isEmpty()) "No members yet"
-                                else "${viewModel.familyMembers.size} active members",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-
-                    if (viewModel.inviteCode != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(SurfaceGlass)
-                                .border(1.dp, EmeraldPrimary.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Invite Code: ${viewModel.inviteCode}",
-                                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-                                color = EmeraldPrimary
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Button(
-                        onClick = { viewModel.generateInviteCode() },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EmeraldPrimary,
-                            contentColor = OnEmeraldPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Text("Create Invite Code", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            item {
-                GlassCard(cornerRadius = 22.dp) {
-                    Text("Add Member", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HisabooTextField(
-                        value = memberName,
-                        onValueChange = { memberName = it },
-                        label = "Your name"
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HisabooTextField(
-                        value = memberPin,
-                        onValueChange = { memberPin = it },
-                        label = "Set PIN",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            viewModel.addFamilyMember(memberName, memberPin)
-                            memberName = ""
-                            memberPin = ""
-                        },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EmeraldPrimary,
-                            contentColor = OnEmeraldPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Text("Add", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun BackupExportScreen(
-    viewModel: HisabooViewModel,
-    onBack: () -> Unit
-) {
-    val context = LocalContext.current
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-
-    // Google Sign-In Launcher
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            if (account != null) {
-                viewModel.onGoogleSignInSuccess(account)
-            }
-        } catch (e: ApiException) {
-            statusMessage = "Google Sign-In error (${e.statusCode}). Add SHA-1 in Google Cloud Console or use offline/Gmail file backup below."
-        }
-    }
-
-    // System File Picker for restoring Hisaboo_Backup.json from anywhere (Gmail downloads, Drive, etc.)
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            statusMessage = viewModel.restoreFromUri(uri)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgObsidian)
-    ) {
-        HisabooSubTopBar(title = "Backup / Export", onBack = onBack)
+        HisabooSubTopBar(title = "Planned Payments", onBack = onBack)
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -195,163 +51,70 @@ fun BackupExportScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Text(
-                    text = "Last backup: ${viewModel.lastBackupText}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-            }
-
-            // 1. Gmail / Google Account Cloud Auto-Sync Card
-            item {
-                GlassCard(
-                    cornerRadius = 22.dp,
-                    containerColor = SurfaceGlass,
-                    borderColor = if (viewModel.connectedGoogleEmail != null) EmeraldPrimary.copy(alpha = 0.5f) else BorderGlass
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            TintedIconBadge(
-                                icon = if (viewModel.connectedGoogleEmail != null) Icons.Rounded.CloudDone else Icons.Rounded.Email,
-                                tint = if (viewModel.connectedGoogleEmail != null) EmeraldPrimary else AmberAccent,
-                                size = 42.dp,
-                                isCircle = true
-                            )
-                            Column {
-                                Text(
-                                    text = if (viewModel.connectedGoogleEmail != null) "Gmail Cloud Sync Active"
-                                    else "Connect Gmail Account",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = viewModel.connectedGoogleEmail
-                                        ?: "Sign in to auto-backup & auto-restore on any phone",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (viewModel.connectedGoogleEmail != null) CashInGreen else TextSecondary
-                                )
-                            }
-                        }
-
-                        if (viewModel.isCloudSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                color = EmeraldPrimary,
-                                strokeWidth = 2.dp
-                            )
-                        }
-                    }
-
+                GlassCard(cornerRadius = 22.dp) {
+                    HisabooTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = "Amount",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HisabooTextField(
+                        value = note,
+                        onValueChange = { note = it },
+                        label = "Note"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HisabooTextField(
+                        value = dayDate,
+                        onValueChange = { dayDate = it },
+                        label = "Date (1-28)",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    if (viewModel.connectedGoogleEmail == null) {
-                        Button(
-                            onClick = {
-                                googleSignInLauncher.launch(viewModel.cloudManager.getSignInIntent())
-                            },
-                            shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = EmeraldPrimary,
-                                contentColor = OnEmeraldPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Icon(Icons.Rounded.Login, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sign in with Gmail / Google", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Auto-backup & auto-restore",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextPrimary
-                            )
-                            Switch(
-                                checked = viewModel.autoCloudSyncEnabled,
-                                onCheckedChange = { viewModel.toggleAutoCloudSync(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = OnEmeraldPrimary,
-                                    checkedTrackColor = EmeraldPrimary
+                    Text(
+                        text = "Category",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        categoryPills.forEach { cat ->
+                            val isSelected = selectedCat == cat
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) EmeraldPrimary else SurfaceGlass)
+                                    .border(1.dp, if (isSelected) EmeraldPrimary else BorderGlass, CircleShape)
+                                    .clickable { selectedCat = cat }
+                                    .padding(horizontal = 13.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = cat,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) OnEmeraldPrimary else TextPrimary
                                 )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { viewModel.manualCloudBackupNow() },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = EmeraldPrimary,
-                                    contentColor = OnEmeraldPrimary
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                            ) {
-                                Text("Cloud Backup", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
-
-                            OutlinedButton(
-                                onClick = { viewModel.manualCloudRestoreNow() },
-                                shape = CircleShape,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary.copy(alpha = 0.5f)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = SurfaceCard,
-                                    contentColor = EmeraldPrimary
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                            ) {
-                                Text("Cloud Restore", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        TextButton(
-                            onClick = { viewModel.disconnectGoogleAccount() },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Disconnect Gmail", color = CashOutRed, fontSize = 12.sp)
                         }
                     }
 
-                    if (viewModel.cloudStatusBanner != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = viewModel.cloudStatusBanner!!,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = CashInGreen
-                        )
-                    }
-                }
-            }
+                    Spacer(modifier = Modifier.height(18.dp))
 
-            // 2. Offline / Local Backup & Restore Pill Buttons
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = { statusMessage = viewModel.backupNow() },
+                        onClick = {
+                            val amt = amount.toDoubleOrNull() ?: 0.0
+                            val day = dayDate.toIntOrNull() ?: 1
+                            viewModel.addPlannedPayment(amt, note, day, selectedCat)
+                            amount = ""
+                            note = ""
+                            dayDate = ""
+                        },
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EmeraldPrimary,
@@ -361,125 +124,32 @@ fun BackupExportScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Backup Now (Offline + Sync)", fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { statusMessage = viewModel.downloadBackupFile() },
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = SurfaceCard,
-                            contentColor = TextPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Text("Download backup file", fontWeight = FontWeight.SemiBold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { statusMessage = viewModel.restoreSavedBackup() },
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = SurfaceCard,
-                            contentColor = TextPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Text("Restore saved backup", fontWeight = FontWeight.SemiBold)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            try {
-                                filePickerLauncher.launch(arrayOf("application/json", "*/*"))
-                            } catch (_: Exception) {
-                                statusMessage = viewModel.restoreFromDownloadsFile()
-                            }
-                        },
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = SurfaceCard,
-                            contentColor = TextPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Text("Restore from file", fontWeight = FontWeight.SemiBold)
+                        Text("Save", fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            // 3. 2-Column Export Tiles
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    GlassCard(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { statusMessage = viewModel.exportExcelCsv() },
-                        cornerRadius = 20.dp
+            items(viewModel.plannedPayments, key = { it.id }) { item ->
+                GlassCard(cornerRadius = 20.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TintedIconBadge(
-                            icon = Icons.Rounded.TableChart,
-                            tint = CashInGreen,
-                            size = 40.dp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Column {
+                            Text(item.note, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "${item.categoryName} • Day ${item.dayOfMonth} of month",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = TextSecondary
+                            )
+                        }
                         Text(
-                            text = "Export Excel (CSV)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 14.sp
+                            text = formatRs(item.amount),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                            color = AmberAccent
                         )
                     }
-
-                    GlassCard(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                try {
-                                    context.startActivity(viewModel.createGmailShareIntent())
-                                } catch (_: Exception) {
-                                    val fallback = Intent.createChooser(
-                                        viewModel.createGmailShareIntent().apply { setPackage(null) },
-                                        "Send Hisaboo Backup"
-                                    )
-                                    context.startActivity(fallback)
-                                }
-                            },
-                        cornerRadius = 20.dp
-                    ) {
-                        TintedIconBadge(
-                            icon = Icons.Rounded.Send,
-                            tint = AmberAccent,
-                            size = 40.dp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Send via Gmail",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-
-            if (statusMessage != null) {
-                item {
-                    Text(
-                        text = statusMessage!!,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = EmeraldPrimary
-                    )
                 }
             }
         }
@@ -487,105 +157,97 @@ fun BackupExportScreen(
 }
 
 @Composable
-fun ChangePinScreen(
+fun SearchScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
-    var oldPin by remember { mutableStateOf("") }
-    var newPin by remember { mutableStateOf("") }
-    var feedback by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    val results = if (query.isBlank()) {
+        emptyList()
+    } else {
+        viewModel.transactions.filter {
+            it.note.contains(query, ignoreCase = true) ||
+                it.categoryName.contains(query, ignoreCase = true)
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Change PIN", onBack = onBack)
+        HisabooSubTopBar(title = "Search", onBack = onBack)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .padding(horizontal = 18.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            GlassCard(cornerRadius = 22.dp) {
-                Text("Security PIN", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(14.dp))
-
-                OutlinedTextField(
-                    value = oldPin,
-                    onValueChange = { oldPin = it },
-                    label = { Text("Old PIN", color = TextSecondary) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceGlass,
-                        unfocusedContainerColor = SurfaceGlass,
-                        focusedBorderColor = EmeraldPrimary,
-                        unfocusedBorderColor = BorderGlass,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = newPin,
-                    onValueChange = { newPin = it },
-                    label = { Text("New PIN", color = TextSecondary) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceGlass,
-                        unfocusedContainerColor = SurfaceGlass,
-                        focusedBorderColor = EmeraldPrimary,
-                        unfocusedBorderColor = BorderGlass,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Button(
-                    onClick = {
-                        if (oldPin != viewModel.currentPin && oldPin != "1234") {
-                            feedback = "Old PIN does not match."
-                        } else if (newPin.length >= 4) {
-                            viewModel.updatePin(newPin)
-                            feedback = "PIN updated and saved permanently."
-                            oldPin = ""
-                            newPin = ""
-                        } else {
-                            feedback = "Please enter at least 4 digits."
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search note or category...", color = TextSecondary) },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Search, contentDescription = null, tint = EmeraldPrimary)
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear", tint = TextSecondary)
                         }
-                    },
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EmeraldPrimary,
-                        contentColor = OnEmeraldPrimary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                ) {
-                    Text("Save", fontWeight = FontWeight.Bold)
-                }
+                    }
+                },
+                singleLine = true,
+                shape = CircleShape,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = SurfaceGlass,
+                    unfocusedContainerColor = SurfaceGlass,
+                    focusedBorderColor = EmeraldPrimary,
+                    unfocusedBorderColor = BorderGlass,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                if (feedback != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = feedback!!,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = EmeraldPrimary
-                    )
+            if (results.isEmpty()) {
+                GlassCard(
+                    cornerRadius = 22.dp,
+                    contentPadding = PaddingValues(32.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TintedIconBadge(
+                            icon = Icons.Rounded.Search,
+                            tint = BlueAccent,
+                            size = 48.dp,
+                            iconSize = 24.dp,
+                            isCircle = true
+                        )
+                        Text(
+                            text = if (query.isBlank()) "Search your ledger" else "No matching records",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Type a note or category name to filter entries instantly",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(results, key = { it.id }) { tx ->
+                        TransactionRowCard(
+                            entry = tx,
+                            onDelete = { viewModel.deleteTransaction(tx.id) }
+                        )
+                    }
                 }
             }
         }
@@ -593,81 +255,294 @@ fun ChangePinScreen(
 }
 
 @Composable
-fun AppLockScreen(
-    correctPin: String,
-    onUnlock: () -> Unit
+fun RemindersScreen(
+    viewModel: HisabooViewModel,
+    onBack: () -> Unit
 ) {
-    var enteredPin by remember { mutableStateOf("") }
-    var errorMsg by remember { mutableStateOf(false) }
+    var title by remember { mutableStateOf("") }
+    var dateText by remember { mutableStateOf("") }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgObsidian)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
     ) {
-        GlassCard(cornerRadius = 26.dp, contentPadding = PaddingValues(24.dp)) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                TintedIconBadge(
-                    icon = Icons.Rounded.Lock,
-                    tint = EmeraldPrimary,
-                    size = 54.dp,
-                    iconSize = 26.dp,
-                    isCircle = true
-                )
-                Text("Hisaboo Locked", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = "Enter your PIN to unlock (Default: 1234)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-                OutlinedTextField(
-                    value = enteredPin,
-                    onValueChange = {
-                        enteredPin = it
-                        errorMsg = false
-                    },
-                    label = { Text("Enter PIN", color = TextSecondary) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceGlass,
-                        unfocusedContainerColor = SurfaceGlass,
-                        focusedBorderColor = EmeraldPrimary,
-                        unfocusedBorderColor = BorderGlass,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (errorMsg) {
-                    Text("Incorrect PIN", color = CashOutRed, style = MaterialTheme.typography.labelMedium)
-                }
-                Button(
-                    onClick = {
-                        if (enteredPin == correctPin) {
-                            onUnlock()
-                        } else {
-                            errorMsg = true
+        HisabooSubTopBar(title = "Reminders", onBack = onBack)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                GlassCard(cornerRadius = 22.dp) {
+                    HisabooTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = "Title"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HisabooTextField(
+                        value = dateText,
+                        onValueChange = { dateText = it },
+                        label = "DD/MM/YYYY",
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarToday,
+                                contentDescription = "Date",
+                                tint = EmeraldPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
-                    },
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = EmeraldPrimary,
-                        contentColor = OnEmeraldPrimary
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                ) {
-                    Text("Unlock Hisaboo", fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.addReminder(title, dateText)
+                            title = ""
+                            dateText = ""
+                        },
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EmeraldPrimary,
+                            contentColor = OnEmeraldPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text("Add Reminder", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            items(viewModel.reminders, key = { it.id }) { rem ->
+                GlassCard(cornerRadius = 20.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            TintedIconBadge(
+                                icon = Icons.Rounded.NotificationsActive,
+                                tint = AmberAccent,
+                                size = 38.dp
+                            )
+                            Column {
+                                Text(rem.title, style = MaterialTheme.typography.titleMedium)
+                                Text(rem.dueDate, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LoanScreen(
+    viewModel: HisabooViewModel,
+    onBack: () -> Unit
+) {
+    var person by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var loanTypeIndex by remember { mutableIntStateOf(0) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgObsidian)
+    ) {
+        HisabooSubTopBar(title = "Loan", onBack = onBack)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                GlassCard(cornerRadius = 22.dp) {
+                    HisabooTextField(
+                        value = person,
+                        onValueChange = { person = it },
+                        label = "Person"
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HisabooTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = "Amount",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    PillSegmentedSwitcher(
+                        options = listOf("To receive", "To return"),
+                        selectedIndex = loanTypeIndex,
+                        onSelect = { loanTypeIndex = it },
+                        activeColor = if (loanTypeIndex == 0) EmeraldPrimary else CashOutRed,
+                        activeTextColor = OnEmeraldPrimary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val amt = amount.toDoubleOrNull() ?: 0.0
+                            viewModel.addLoan(person, amt, loanTypeIndex == 0)
+                            person = ""
+                            amount = ""
+                        },
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EmeraldPrimary,
+                            contentColor = OnEmeraldPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text("Add", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            items(viewModel.loans, key = { it.id }) { loan ->
+                val accent = if (loan.isToReceive) CashInGreen else CashOutRed
+                val tag = if (loan.isToReceive) "To receive" else "To return"
+                GlassCard(cornerRadius = 20.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(loan.person, style = MaterialTheme.typography.titleMedium)
+                            Text(tag, style = MaterialTheme.typography.labelMedium, color = accent)
+                        }
+                        Text(
+                            text = formatRs(loan.amount),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Bold,
+                            color = accent
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UtilityBillsScreen(
+    viewModel: HisabooViewModel,
+    onBack: () -> Unit
+) {
+    val providers = listOf("LESCO", "KE", "MEPCO", "SNGPL", "SSGC", "PTCL")
+    var providerIndex by remember { mutableIntStateOf(0) }
+    var title by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var dueDate by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgObsidian)
+    ) {
+        HisabooSubTopBar(title = "Utility Bills", onBack = onBack)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                GlassCard(cornerRadius = 22.dp) {
+                    HisabooTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = "Title"
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(SurfaceGlass)
+                            .border(1.dp, BorderGlass, CircleShape)
+                            .clickable { providerIndex = (providerIndex + 1) % providers.size }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Rounded.Bolt, contentDescription = null, tint = AmberAccent, modifier = Modifier.size(18.dp))
+                        Text(
+                            text = "Provider: ${providers[providerIndex]}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HisabooTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = "Amount",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HisabooTextField(
+                        value = dueDate,
+                        onValueChange = { dueDate = it },
+                        label = "Due date DD/MM/YYYY"
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val amt = amount.toDoubleOrNull() ?: 0.0
+                            viewModel.addUtilityBill(title, providers[providerIndex], amt, dueDate)
+                            title = ""
+                            amount = ""
+                            dueDate = ""
+                        },
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EmeraldPrimary,
+                            contentColor = OnEmeraldPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text("Add", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            items(viewModel.utilityBills, key = { it.id }) { bill ->
+                GlassCard(cornerRadius = 20.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(bill.title, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "${bill.provider} • Due: ${bill.dueDate}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = TextSecondary
+                            )
+                        }
+                        Text(
+                            text = formatRs(bill.amount),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Bold,
+                            color = AmberAccent
+                        )
+                    }
                 }
             }
         }
