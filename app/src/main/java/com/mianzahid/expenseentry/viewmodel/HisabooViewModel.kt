@@ -48,10 +48,10 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     val familyMembers = mutableStateListOf<FamilyMemberItem>()
     var inviteCode by mutableStateOf<String?>(null)
 
-    // Security & Settings
+    // Security & Settings (Locked on cold launch by default)
     var fingerprintEnabled by mutableStateOf(false)
     var appLanguage by mutableStateOf("English")
-    var isAppLocked by mutableStateOf(false)
+    var isAppLocked by mutableStateOf(true)
     var currentPin by mutableStateOf("1234")
     var lastBackupText by mutableStateOf("Never")
     var usdToPkrRate by mutableDoubleStateOf(278.50)
@@ -96,16 +96,15 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             persistState(triggerCloudSync = false)
         }
 
+        // Always lock on app launch
+        isAppLocked = true
         liveCurrencyRates["PKR"] = usdToPkrRate
 
-        // Auto-fetch latest live USD exchange rates on startup
         fetchLiveUsdRate()
 
-        // Check if user was already signed in with Gmail/Google
         val lastAccount = cloudManager.getLastSignedInAccount()
         if (lastAccount != null && !lastAccount.email.isNullOrBlank()) {
             connectedGoogleEmail = lastAccount.email
-            // If fresh install (no transactions yet) & signed in, auto-restore from cloud!
             if (transactions.isEmpty()) {
                 autoRestoreFromCloudIfAvailable(lastAccount)
             }
@@ -208,7 +207,6 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             autoCloudSyncEnabled = autoCloudSyncEnabled
         )
 
-        // If user is logged into Gmail/Google & Auto-Sync is ON, auto-backup in background
         if (triggerCloudSync && autoCloudSyncEnabled && !connectedGoogleEmail.isNullOrBlank()) {
             val account = cloudManager.getLastSignedInAccount() ?: return
             val jsonSnapshot = buildCurrentJsonString(pretty = false)
@@ -327,12 +325,29 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             if (loanArr != null) {
                 for (i in 0 until loanArr.length()) {
                     val o = loanArr.getJSONObject(i)
+                    val paymentList = mutableListOf<LoanPaymentRecord>()
+                    val payArr = o.optJSONArray("payments")
+                    if (payArr != null) {
+                        for (j in 0 until payArr.length()) {
+                            val po = payArr.getJSONObject(j)
+                            paymentList.add(
+                                LoanPaymentRecord(
+                                    id = po.getString("id"),
+                                    amount = po.getDouble("amount"),
+                                    note = po.optString("note", ""),
+                                    date = po.optString("date", ""),
+                                    isAdditionalLoan = po.optBoolean("isAdditionalLoan", false)
+                                )
+                            )
+                        }
+                    }
                     loans.add(
                         LoanItem(
                             id = o.getString("id"),
                             person = o.getString("person"),
                             amount = o.getDouble("amount"),
-                            isToReceive = o.getBoolean("isToReceive")
+                            isToReceive = o.getBoolean("isToReceive"),
+                            payments = paymentList
                         )
                     )
                 }
@@ -381,16 +396,11 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             val savedEmail = root.optString("connectedEmail", "")
             if (savedEmail.isNotBlank()) connectedGoogleEmail = savedEmail
             autoCloudSyncEnabled = root.optBoolean("autoCloudSyncEnabled", true)
-
-            if (fingerprintEnabled) {
-                isAppLocked = true
-            }
         } catch (_: Exception) {
             if (categories.isEmpty()) loadDefaultCategories()
         }
     }
 
-    // Called when user logs into Gmail / Google Account inside the app
     fun onGoogleSignInSuccess(account: GoogleSignInAccount) {
         connectedGoogleEmail = account.email
         persistState(triggerCloudSync = false)
@@ -405,19 +415,16 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             if (downloadResult.isSuccess) {
                 val cloudJson = downloadResult.getOrNull()
                 if (cloudJson != null) {
-                    // If local phone is empty, auto-restore immediately like Google Contacts!
                     if (transactions.isEmpty()) {
                         restoreFromJson(cloudJson)
                         persistState(triggerCloudSync = false)
                         cloudStatusBanner = "Auto-restored ledger from ${account.email}"
                     } else {
-                        // Local already has data -> upload latest local state to cloud
                         cloudManager.uploadBackupToCloud(account, buildCurrentJsonString(false))
                         cloudStatusBanner = "Connected & synced with ${account.email}"
                     }
                 }
             } else {
-                // First time connecting this Gmail -> upload initial backup
                 val uploadRes = cloudManager.uploadBackupToCloud(account, buildCurrentJsonString(false))
                 cloudStatusBanner = if (uploadRes.isSuccess) {
                     val time = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date())
@@ -487,7 +494,6 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
         persistState(triggerCloudSync = enabled)
     }
 
-    // Computed Balances
     val totalCashIn: Double
         get() = transactions.filter { it.type == TransactionType.CASH_IN }.sumOf { it.amount }
 
@@ -586,16 +592,61 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
         persistState()
     }
 
+    // Complete Loan Khata Functions
     fun addLoan(person: String, amount: Double, isToReceive: Boolean) {
         if (person.isBlank() || amount <= 0) return
         loans.add(
+            0,
             LoanItem(
                 id = UUID.randomUUID().toString(),
                 person = person.trim(),
                 amount = amount,
-                isToReceive = isToReceive
+                isToReceive = isToReceive,
+                payments = emptyList()
             )
         )
+        persistState()
+    }
+
+    fun deleteLoan(loanId: String) {
+        loans.removeAll { it.id == loanId }
+        persistState()
+    }
+
+    fun addLoanPayment(
+        loanId: String,
+        amount: Double,
+        note: String,
+        date: String,
+        isAdditionalLoan: Boolean = false
+    ) {
+        if (amount <= 0) return
+        val idx = loans.indexOfFirst { it.id == loanId }
+        if (idx == -1) return
+        val existing = loans[idx]
+        val defaultNote = if (isAdditionalLoan) {
+            "Additional loan added"
+        } else if (existing.isToReceive) {
+            "Payment received"
+        } else {
+            "Payment returned"
+        }
+        val newRecord = LoanPaymentRecord(
+            id = UUID.randomUUID().toString(),
+            amount = amount,
+            note = note.ifBlank { defaultNote },
+            date = date.ifBlank { todayFormatted() },
+            isAdditionalLoan = isAdditionalLoan
+        )
+        loans[idx] = existing.copy(payments = listOf(newRecord) + existing.payments)
+        persistState()
+    }
+
+    fun deleteLoanPayment(loanId: String, paymentId: String) {
+        val idx = loans.indexOfFirst { it.id == loanId }
+        if (idx == -1) return
+        val existing = loans[idx]
+        loans[idx] = existing.copy(payments = existing.payments.filterNot { it.id == paymentId })
         persistState()
     }
 
@@ -654,7 +705,6 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Local & File Backup / Restore Actions
     fun backupNow(): String {
         val json = buildCurrentJsonString(pretty = false)
         val time = storage.saveManualSnapshot(json)
