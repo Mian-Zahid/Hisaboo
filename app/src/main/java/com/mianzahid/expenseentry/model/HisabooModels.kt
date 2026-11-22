@@ -45,12 +45,30 @@ data class ReminderItem(
     val isCompleted: Boolean = false
 )
 
+data class LoanPaymentRecord(
+    val id: String,
+    val amount: Double,
+    val note: String,
+    val date: String,
+    val isAdditionalLoan: Boolean = false // false = payment returned/received, true = more loan added
+)
+
 data class LoanItem(
     val id: String,
     val person: String,
     val amount: Double,
-    val isToReceive: Boolean // true = To receive, false = To return
-)
+    val isToReceive: Boolean, // true = To receive, false = To return
+    val payments: List<LoanPaymentRecord> = emptyList()
+) {
+    val totalLoanAmount: Double
+        get() = amount + payments.filter { it.isAdditionalLoan }.sumOf { it.amount }
+
+    val settledAmount: Double
+        get() = payments.filter { !it.isAdditionalLoan }.sumOf { it.amount }
+
+    val remainingAmount: Double
+        get() = (totalLoanAmount - settledAmount).coerceAtLeast(0.0)
+}
 
 data class UtilityBillItem(
     val id: String,
