@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -15,7 +16,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.mianzahid.expenseentry.model.*
 import com.mianzahid.expenseentry.storage.GoogleCloudBackupManager
 import com.mianzahid.expenseentry.storage.HisabooStorage
+import com.mianzahid.expenseentry.ui.theme.isHisabooDarkTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -48,9 +51,10 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     val familyMembers = mutableStateListOf<FamilyMemberItem>()
     var inviteCode by mutableStateOf<String?>(null)
 
-    // Security & Settings (Locked on cold launch by default)
+    // Security, Theme & Language Settings (Default: Light Mode & English)
     var fingerprintEnabled by mutableStateOf(false)
     var appLanguage by mutableStateOf("English")
+    var isDarkMode by mutableStateOf(false)
     var isAppLocked by mutableStateOf(true)
     var currentPin by mutableStateOf("1234")
     var lastBackupText by mutableStateOf("Never")
@@ -78,14 +82,64 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
     var isCloudSyncing by mutableStateOf(false)
     var cloudStatusBanner by mutableStateOf<String?>(null)
 
-    // Hadith State (Default: URDU)
+    // Live Hadith State (Refreshes every time app opens or unlocks — no timer)
     var selectedHadithLang by mutableStateOf(HadithLanguage.URDU)
-    val dailyHadith = DailyHadith(
-        arabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
-        urdu = "اعمال کا دارومدار نیتوں پر ہے اور ہر شخص کو وہی ملے گا جس کی اس نے نیت کی۔",
-        english = "Actions are judged by intentions, and every person will get the reward according to what they intended.",
-        reference = "Sahih al-Bukhari 1"
+    var isFetchingHadith by mutableStateOf(false)
+    private var lastHadithNumber by mutableIntStateOf(-1)
+
+    private val offlineHadithPool = listOf(
+        DailyHadith(
+            arabic = "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
+            urdu = "اعمال کا دارومدار نیتوں پر ہے اور ہر شخص کو وہی ملے گا جس کی اس نے نیت کی۔",
+            english = "Actions are judged by intentions, and every person will get the reward according to what they intended.",
+            reference = "Sahih al-Bukhari 1"
+        ),
+        DailyHadith(
+            arabic = "التَّاجِرُ الصَّدُوقُ الأَمِينُ مَعَ النَّبِيِّينَ وَالصِّدِّيقِينَ وَالشُّهَدَاءِ",
+            urdu = "سچا اور امانت دار تاجر قیامت کے دن نبیوں، صدیقوں اور شہیدوں کے ساتھ ہوگا۔",
+            english = "The truthful, trustworthy merchant will be with the Prophets, the truthful, and the martyrs.",
+            reference = "Jami at-Tirmidhi 1209"
+        ),
+        DailyHadith(
+            arabic = "مَا نَقَصَتْ صَدَقَةٌ مِنْ مَالٍ",
+            urdu = "صدقہ دینے سے مال میں کبھی کمی نہیں آتی۔",
+            english = "Charity does not decrease wealth in any way.",
+            reference = "Sahih Muslim 2588"
+        ),
+        DailyHadith(
+            arabic = "خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ",
+            urdu = "لوگوں میں سب سے بہتر وہ ہے جو دوسروں کو سب سے زیادہ فائدہ پہنچائے۔",
+            english = "The best of people are those who are most beneficial to people.",
+            reference = "Al-Mu'jam al-Awsat 6192"
+        ),
+        DailyHadith(
+            arabic = "الْيَدُ الْعُلْيَا خَيْرٌ مِنَ الْيَدِ السُّفْلَى",
+            urdu = "اوپر والا (دینے والا) ہاتھ نیچے والے (لینے والے) ہاتھ سے بہتر ہے۔",
+            english = "The upper hand (the one that gives) is better than the lower hand (the one that receives).",
+            reference = "Sahih al-Bukhari 1427"
+        ),
+        DailyHadith(
+            arabic = "مَنْ أَنْظَرَ مُعْسِرًا أَوْ وَضَعَ عَنْهُ أَظَلَّهُ اللَّهُ فِي ظِلِّهِ",
+            urdu = "جس نے کسی تنگ دست قرض دار کو مہلت دی یا اس کا قرض معاف کر دیا، اللہ اسے قیامت کے دن اپنے سائے میں جگہ دے گا۔",
+            english = "Whoever grants respite to an indebted person in hardship or waives the debt, Allah will shade him under His Throne.",
+            reference = "Sahih Muslim 3006"
+        ),
+        DailyHadith(
+            arabic = "مَطْلُ الْغَنِيِّ ظُلْمٌ",
+            urdu = "مال دار شخص کا قرض کی ادائیگی میں ٹال مٹول کرنا ظلم ہے۔",
+            english = "Procrastination in repaying a debt by a wealthy person is injustice.",
+            reference = "Sahih al-Bukhari 2287"
+        ),
+        DailyHadith(
+            arabic = "لَيْسَ الْغِنَى عَنْ كَثْرَةِ الْعَرَضِ، وَلَكِنَّ الْغِنَى غِنَى النَّفْسِ",
+            urdu = "مال داری سامان کی کثرت کا نام نہیں بلکہ اصل مال داری دل کا غنی ہونا ہے۔",
+            english = "Wealth is not in having many possessions; rather, true wealth is the richness of the soul.",
+            reference = "Sahih al-Bukhari 6446"
+        )
     )
+
+    var dailyHadith by mutableStateOf(offlineHadithPool.random())
+        private set
 
     init {
         val savedJson = storage.loadRawJson()
@@ -93,14 +147,16 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             restoreFromJson(savedJson)
         } else {
             loadDefaultCategories()
+            isDarkMode = false
+            isHisabooDarkTheme = false
             persistState(triggerCloudSync = false)
         }
 
-        // Always lock on app launch
         isAppLocked = true
         liveCurrencyRates["PKR"] = usdToPkrRate
 
         fetchLiveUsdRate()
+        fetchLiveHadith()
 
         val lastAccount = cloudManager.getLastSignedInAccount()
         if (lastAccount != null && !lastAccount.email.isNullOrBlank()) {
@@ -108,6 +164,106 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             if (transactions.isEmpty()) {
                 autoRestoreFromCloudIfAvailable(lastAccount)
             }
+        }
+    }
+
+    fun onAppOpenedOrUnlocked() {
+        isAppLocked = false
+        fetchLiveHadith()
+    }
+
+    fun fetchLiveHadith() {
+        if (isFetchingHadith) return
+        // Immediately rotate offline fallback so user sees a fresh Hadith right away
+        val nextOffline = offlineHadithPool.filterNot { it.reference == dailyHadith.reference }
+            .randomOrNull() ?: offlineHadithPool.random()
+        dailyHadith = nextOffline
+
+        viewModelScope.launch {
+            isFetchingHadith = true
+            try {
+                // Curated authentic short-to-medium Hadith numbers from Sahih al-Bukhari
+                val authenticNumbers = listOf(
+                    1, 6, 8, 10, 13, 15, 24, 33, 52, 69,
+                    528, 645, 1417, 1427, 1434, 1469, 2072, 2076,
+                    2287, 2389, 2442, 2563, 2749, 6011, 6018, 6064, 6116, 6412, 6446, 6502
+                )
+                val chosenNum = authenticNumbers.filterNot { it == lastHadithNumber }.random()
+                lastHadithNumber = chosenNum
+
+                val liveResult = withContext(Dispatchers.IO) {
+                    val urdDeferred = async {
+                        fetchHttpText("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/urd-bukhari/$chosenNum.min.json")
+                    }
+                    val engDeferred = async {
+                        fetchHttpText("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/eng-bukhari/$chosenNum.min.json")
+                    }
+                    val araDeferred = async {
+                        fetchHttpText("https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/ara-bukhari/$chosenNum.min.json")
+                    }
+
+                    val urdJson = urdDeferred.await()
+                    val engJson = engDeferred.await()
+                    val araJson = araDeferred.await()
+
+                    val urdText = extractHadithText(urdJson)
+                    val engText = extractHadithText(engJson)
+                    val araText = extractHadithText(araJson)
+
+                    if (!urdText.isNullOrBlank() && !engText.isNullOrBlank()) {
+                        DailyHadith(
+                            arabic = araText?.takeIf { it.isNotBlank() } ?: urdText,
+                            urdu = urdText,
+                            english = engText,
+                            reference = "Sahih al-Bukhari $chosenNum"
+                        )
+                    } else {
+                        null
+                    }
+                }
+
+                if (liveResult != null) {
+                    dailyHadith = liveResult
+                }
+            } catch (_: Exception) {
+                // Keep rotated offline authentic Hadith silently if offline
+            } finally {
+                isFetchingHadith = false
+            }
+        }
+    }
+
+    private fun fetchHttpText(urlString: String): String? {
+        return try {
+            val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 8000
+                setRequestProperty("Accept", "application/json")
+            }
+            try {
+                if (conn.responseCode == 200) {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    null
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun extractHadithText(rawJson: String?): String? {
+        if (rawJson.isNullOrBlank()) return null
+        return try {
+            val root = JSONObject(rawJson)
+            val arr = root.optJSONArray("hadiths") ?: return null
+            if (arr.length() == 0) return null
+            arr.getJSONObject(0).optString("text", "").trim()
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -200,6 +356,7 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             inviteCode = inviteCode,
             fingerprintEnabled = fingerprintEnabled,
             appLanguage = appLanguage,
+            isDarkMode = isDarkMode,
             currentPin = currentPin,
             lastBackupText = lastBackupText,
             usdToPkrRate = usdToPkrRate,
@@ -219,7 +376,7 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
                         categories.toList(), transactions.toList(), categoryBudgets.toMap(),
                         plannedPayments.toList(), reminders.toList(), loans.toList(),
                         utilityBills.toList(), familyMembers.toList(), inviteCode,
-                        fingerprintEnabled, appLanguage, currentPin, lastBackupText,
+                        fingerprintEnabled, appLanguage, isDarkMode, currentPin, lastBackupText,
                         usdToPkrRate, connectedGoogleEmail, autoCloudSyncEnabled
                     )
                 }
@@ -389,6 +546,8 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
             inviteCode = code.ifBlank { null }
             fingerprintEnabled = root.optBoolean("fingerprintEnabled", false)
             appLanguage = root.optString("appLanguage", "English")
+            isDarkMode = root.optBoolean("isDarkMode", false)
+            isHisabooDarkTheme = isDarkMode
             currentPin = root.optString("currentPin", "1234")
             lastBackupText = root.optString("lastBackupText", "Never")
             usdToPkrRate = root.optDouble("usdToPkrRate", 278.50)
@@ -592,7 +751,6 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
         persistState()
     }
 
-    // Complete Loan Khata Functions
     fun addLoan(person: String, amount: Double, isToReceive: Boolean) {
         if (person.isBlank() || amount <= 0) return
         loans.add(
@@ -624,12 +782,13 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
         val idx = loans.indexOfFirst { it.id == loanId }
         if (idx == -1) return
         val existing = loans[idx]
+        val isUrdu = appLanguage == "اردو"
         val defaultNote = if (isAdditionalLoan) {
-            "Additional loan added"
+            if (isUrdu) "مزید قرض شامل کیا" else "Additional loan added"
         } else if (existing.isToReceive) {
-            "Payment received"
+            if (isUrdu) "رقم وصول ہوئی" else "Payment received"
         } else {
-            "Payment returned"
+            if (isUrdu) "رقم واپس کی" else "Payment returned"
         }
         val newRecord = LoanPaymentRecord(
             id = UUID.randomUUID().toString(),
@@ -689,6 +848,12 @@ class HisabooViewModel(application: Application) : AndroidViewModel(application)
 
     fun toggleLanguage() {
         appLanguage = if (appLanguage == "English") "اردو" else "English"
+        persistState()
+    }
+
+    fun toggleThemeMode() {
+        isDarkMode = !isDarkMode
+        isHisabooDarkTheme = isDarkMode
         persistState()
     }
 
