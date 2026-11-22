@@ -18,13 +18,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -71,11 +71,12 @@ fun HisabooMainScaffold(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val isUrdu = viewModel.appLanguage == "اردو"
 
     var quickEntryType by remember { mutableStateOf<TransactionType?>(null) }
     var showExitDialog by remember { mutableStateOf(false) }
 
-    // Auto-lock immediately whenever app goes to background, minimized, or screen turns off
+    // Auto-lock immediately whenever app goes to background or screen turns off
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
@@ -94,10 +95,10 @@ fun HisabooMainScaffold(
     }
 
     val dockTabs = listOf(
-        DockTab(HisabooRoutes.HOME, "Home", Icons.Rounded.Home),
-        DockTab(HisabooRoutes.CATEGORIES, "Categories", Icons.Rounded.Category),
-        DockTab(HisabooRoutes.TOOLS, "Tools", Icons.Rounded.Calculate),
-        DockTab(HisabooRoutes.LOAN, "Loan", Icons.Rounded.Handshake)
+        DockTab(HisabooRoutes.HOME, if (isUrdu) "ہوم" else "Home", Icons.Rounded.Home),
+        DockTab(HisabooRoutes.CATEGORIES, if (isUrdu) "اقسام" else "Categories", Icons.Rounded.Category),
+        DockTab(HisabooRoutes.TOOLS, if (isUrdu) "ٹولز" else "Tools", Icons.Rounded.Calculate),
+        DockTab(HisabooRoutes.LOAN, if (isUrdu) "قرض" else "Loan", Icons.Rounded.Handshake)
     )
 
     val showFloatingDock = currentRoute in dockTabs.map { it.route }
@@ -106,7 +107,7 @@ fun HisabooMainScaffold(
         AppLockScreen(
             correctPin = viewModel.currentPin,
             fingerprintEnabled = viewModel.fingerprintEnabled,
-            onUnlock = { viewModel.isAppLocked = false }
+            onUnlock = { viewModel.onAppOpenedOrUnlocked() }
         )
         return
     }
@@ -279,14 +280,18 @@ fun HisabooMainScaffold(
                             isCircle = true
                         )
                         Text(
-                            text = "Exit & Lock Hisaboo?",
+                            text = if (isUrdu) "حسابو بند کریں؟" else "Exit & Lock Hisaboo?",
                             style = MaterialTheme.typography.titleLarge,
                             color = TextPrimary
                         )
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Do you want to exit the app? Hisaboo will automatically lock for your security.",
+                        text = if (isUrdu) {
+                            "کیا آپ ایپ بند کرنا چاہتے ہیں؟ آپ کی حفاظت کے لیے حسابو خودکار لاک ہو جائے گا۔"
+                        } else {
+                            "Do you want to exit the app? Hisaboo will automatically lock for your security."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
@@ -307,7 +312,7 @@ fun HisabooMainScaffold(
                                 .weight(1f)
                                 .height(46.dp)
                         ) {
-                            Text("Cancel", fontWeight = FontWeight.SemiBold)
+                            Text(if (isUrdu) "منسوخ" else "Cancel", fontWeight = FontWeight.SemiBold)
                         }
                         Button(
                             onClick = {
@@ -324,7 +329,7 @@ fun HisabooMainScaffold(
                                 .weight(1f)
                                 .height(46.dp)
                         ) {
-                            Text("Exit & Lock", fontWeight = FontWeight.Bold)
+                            Text(if (isUrdu) "بند اور لاک" else "Exit & Lock", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -349,7 +354,7 @@ private fun FloatingGlassCapsuleDock(
         Row(
             modifier = Modifier
                 .clip(CircleShape)
-                .background(SurfaceGlass.copy(alpha = 0.96f))
+                .background(SurfaceCard.copy(alpha = 0.97f))
                 .border(1.dp, BorderGlass, CircleShape)
                 .padding(horizontal = 8.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
