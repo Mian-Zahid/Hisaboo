@@ -1,5 +1,7 @@
 package com.mianzahid.expenseentry.ui.navigation
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,10 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Calculate
-import androidx.compose.material.icons.rounded.Category
-import androidx.compose.material.icons.rounded.Handshake
-import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,15 +17,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.mianzahid.expenseentry.model.TransactionType
+import com.mianzahid.expenseentry.ui.components.GlassCard
+import com.mianzahid.expenseentry.ui.components.TintedIconBadge
 import com.mianzahid.expenseentry.ui.screens.*
 import com.mianzahid.expenseentry.ui.theme.*
 import com.mianzahid.expenseentry.viewmodel.HisabooViewModel
@@ -60,11 +66,32 @@ private data class DockTab(
 fun HisabooMainScaffold(
     viewModel: HisabooViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     var quickEntryType by remember { mutableStateOf<TransactionType?>(null) }
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    // Auto-lock immediately whenever app goes to background, minimized, or screen turns off
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                viewModel.isAppLocked = true
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Intercept Back press on Home screen to ask permission before exiting & locking
+    BackHandler(enabled = !viewModel.isAppLocked && currentRoute == HisabooRoutes.HOME) {
+        showExitDialog = true
+    }
 
     val dockTabs = listOf(
         DockTab(HisabooRoutes.HOME, "Home", Icons.Rounded.Home),
@@ -78,6 +105,7 @@ fun HisabooMainScaffold(
     if (viewModel.isAppLocked) {
         AppLockScreen(
             correctPin = viewModel.currentPin,
+            fingerprintEnabled = viewModel.fingerprintEnabled,
             onUnlock = { viewModel.isAppLocked = false }
         )
         return
@@ -235,6 +263,72 @@ fun HisabooMainScaffold(
                     quickEntryType = null
                 }
             )
+        }
+
+        if (showExitDialog) {
+            Dialog(onDismissRequest = { showExitDialog = false }) {
+                GlassCard(cornerRadius = 24.dp) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TintedIconBadge(
+                            icon = Icons.Rounded.Lock,
+                            tint = EmeraldPrimary,
+                            size = 40.dp,
+                            isCircle = true
+                        )
+                        Text(
+                            text = "Exit & Lock Hisaboo?",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Do you want to exit the app? Hisaboo will automatically lock for your security.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showExitDialog = false },
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = SurfaceGlass,
+                                contentColor = TextPrimary
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Text("Cancel", fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = {
+                                showExitDialog = false
+                                viewModel.isAppLocked = true
+                                (context as? Activity)?.finish()
+                            },
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = EmeraldPrimary,
+                                contentColor = OnEmeraldPrimary
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Text("Exit & Lock", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
         }
     }
 }
