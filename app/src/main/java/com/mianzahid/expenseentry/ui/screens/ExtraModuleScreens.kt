@@ -34,6 +34,7 @@ fun PlannedPaymentsScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     val categoryPills = listOf(
         "Bills", "Food", "Other Expense", "Rent",
         "Shopping", "Transport", "Business", "Other Income", "Salary"
@@ -48,7 +49,10 @@ fun PlannedPaymentsScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Planned Payments", onBack = onBack)
+        HisabooSubTopBar(
+            title = if (isUrdu) "طے شدہ ادائیگیاں" else "Planned Payments",
+            onBack = onBack
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -60,26 +64,26 @@ fun PlannedPaymentsScreen(
                     HisabooTextField(
                         value = amount,
                         onValueChange = { amount = it },
-                        label = "Amount",
+                        label = if (isUrdu) "رقم" else "Amount",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = note,
                         onValueChange = { note = it },
-                        label = "Note"
+                        label = if (isUrdu) "تفصیل" else "Note"
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = dayDate,
                         onValueChange = { dayDate = it },
-                        label = "Date (1-28)",
+                        label = if (isUrdu) "تاریخ (1-28)" else "Date (1-28)",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Category",
+                        text = if (isUrdu) "قسم" else "Category",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
@@ -129,7 +133,7 @@ fun PlannedPaymentsScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Save", fontWeight = FontWeight.Bold)
+                        Text(if (isUrdu) "محفوظ کریں" else "Save", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -144,7 +148,7 @@ fun PlannedPaymentsScreen(
                         Column {
                             Text(item.note, style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "${item.categoryName} • Day ${item.dayOfMonth} of month",
+                                "${item.categoryName} • Day ${item.dayOfMonth}",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = TextSecondary
                             )
@@ -166,6 +170,7 @@ fun SearchScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     var query by remember { mutableStateOf("") }
     val results = if (query.isBlank()) {
         emptyList()
@@ -181,7 +186,7 @@ fun SearchScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Search", onBack = onBack)
+        HisabooSubTopBar(title = if (isUrdu) "تلاش" else "Search", onBack = onBack)
 
         Column(
             modifier = Modifier
@@ -192,7 +197,12 @@ fun SearchScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Search note or category...", color = TextSecondary) },
+                placeholder = {
+                    Text(
+                        if (isUrdu) "تفصیل یا قسم تلاش کریں..." else "Search note or category...",
+                        color = TextSecondary
+                    )
+                },
                 leadingIcon = {
                     Icon(Icons.Rounded.Search, contentDescription = null, tint = EmeraldPrimary)
                 },
@@ -234,14 +244,23 @@ fun SearchScreen(
                             isCircle = true
                         )
                         Text(
-                            text = if (query.isBlank()) "Search your ledger" else "No matching records",
+                            text = if (query.isBlank()) {
+                                if (isUrdu) "اپنا کھاتہ تلاش کریں" else "Search your ledger"
+                            } else {
+                                if (isUrdu) "کوئی ریکارڈ نہیں ملا" else "No matching records"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimary
                         )
                         Text(
-                            text = "Type a note or category name to filter entries instantly",
+                            text = if (isUrdu) {
+                                "فوری تلاش کے لیے تفصیل یا قسم لکھیں"
+                            } else {
+                                "Type a note or category name to filter entries instantly"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -264,6 +283,7 @@ fun RemindersScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     var title by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
 
@@ -272,7 +292,7 @@ fun RemindersScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Reminders", onBack = onBack)
+        HisabooSubTopBar(title = if (isUrdu) "یاد دہانیاں" else "Reminders", onBack = onBack)
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -284,7 +304,7 @@ fun RemindersScreen(
                     HisabooTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = "Title"
+                        label = if (isUrdu) "عنوان" else "Title"
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
@@ -316,7 +336,7 @@ fun RemindersScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Add Reminder", fontWeight = FontWeight.Bold)
+                        Text(if (isUrdu) "یاد دہانی شامل کریں" else "Add Reminder", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -354,6 +374,7 @@ fun LoanScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     var selectedLoanId by remember { mutableStateOf<String?>(null) }
     val selectedLoan = viewModel.loans.find { it.id == selectedLoanId }
 
@@ -379,14 +400,16 @@ fun LoanScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Loan Khata", onBack = onBack)
+        HisabooSubTopBar(
+            title = if (isUrdu) "قرض کھاتہ" else "Loan Ledger",
+            onBack = onBack
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Overall Remaining Summary Row
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -398,7 +421,7 @@ fun LoanScreen(
                         contentPadding = PaddingValues(14.dp)
                     ) {
                         Text(
-                            text = "BAQI LENE HAIN",
+                            text = if (isUrdu) "باقی لینے ہیں" else "TO RECEIVE",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = CashInGreen
@@ -418,7 +441,7 @@ fun LoanScreen(
                         contentPadding = PaddingValues(14.dp)
                     ) {
                         Text(
-                            text = "BAQI DENE HAIN",
+                            text = if (isUrdu) "باقی دینے ہیں" else "TO RETURN",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = CashOutRed
@@ -434,24 +457,27 @@ fun LoanScreen(
                 }
             }
 
-            // Add New Person Form
             item {
                 GlassCard(cornerRadius = 22.dp) {
                     HisabooTextField(
                         value = person,
                         onValueChange = { person = it },
-                        label = "Person Name"
+                        label = if (isUrdu) "فرد کا نام" else "Person Name"
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = amount,
                         onValueChange = { amount = it },
-                        label = "Initial Amount (Rs)",
+                        label = if (isUrdu) "ابتدائی رقم (روپے)" else "Initial Amount (Rs)",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     PillSegmentedSwitcher(
-                        options = listOf("To receive (Lena)", "To return (Dena)"),
+                        options = if (isUrdu) {
+                            listOf("وصول کرنے ہیں", "واپس کرنے ہیں")
+                        } else {
+                            listOf("To receive", "To return")
+                        },
                         selectedIndex = loanTypeIndex,
                         onSelect = { loanTypeIndex = it },
                         activeColor = if (loanTypeIndex == 0) EmeraldPrimary else CashOutRed,
@@ -474,7 +500,10 @@ fun LoanScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Add Person to Khata", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isUrdu) "کھاتہ میں شامل کریں" else "Add Person",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -482,7 +511,11 @@ fun LoanScreen(
             if (viewModel.loans.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Tap any person to open Khata & add installments",
+                        text = if (isUrdu) {
+                            "تفصیل اور قسطیں درج کرنے کے لیے کسی بھی فرد پر ٹیپ کریں"
+                        } else {
+                            "Tap any person to open ledger & add installments"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
@@ -491,8 +524,16 @@ fun LoanScreen(
 
             items(viewModel.loans, key = { it.id }) { loan ->
                 val accent = if (loan.isToReceive) CashInGreen else CashOutRed
-                val tag = if (loan.isToReceive) "To receive (Lena)" else "To return (Dena)"
-                val settledLabel = if (loan.isToReceive) "Received" else "Paid"
+                val tag = if (loan.isToReceive) {
+                    if (isUrdu) "وصول کرنے ہیں" else "To receive"
+                } else {
+                    if (isUrdu) "واپس کرنے ہیں" else "To return"
+                }
+                val settledLabel = if (loan.isToReceive) {
+                    if (isUrdu) "وصول شدہ" else "Received"
+                } else {
+                    if (isUrdu) "ادا شدہ" else "Paid"
+                }
 
                 GlassCard(
                     cornerRadius = 20.dp,
@@ -546,7 +587,7 @@ fun LoanScreen(
                             }
                             Icon(
                                 imageVector = Icons.Rounded.ChevronRight,
-                                contentDescription = "Open Khata",
+                                contentDescription = "Open Ledger",
                                 tint = TextSecondary,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -565,7 +606,11 @@ fun LoanScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Total", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(
+                                text = if (isUrdu) "کل رقم" else "Total",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
                             Text(
                                 text = formatRs(loan.totalLoanAmount),
                                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
@@ -574,7 +619,11 @@ fun LoanScreen(
                             )
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(settledLabel, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(
+                                text = settledLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
                             Text(
                                 text = formatRs(loan.settledAmount),
                                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
@@ -583,7 +632,11 @@ fun LoanScreen(
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Remaining", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(
+                                text = if (isUrdu) "باقی" else "Remaining",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
                             Text(
                                 text = formatRs(loan.remainingAmount),
                                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
@@ -600,10 +653,17 @@ fun LoanScreen(
     loanToDelete?.let { target ->
         Dialog(onDismissRequest = { loanToDelete = null }) {
             GlassCard(cornerRadius = 24.dp) {
-                Text("Delete ${target.person}?", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = if (isUrdu) "${target.person} کو حذف کریں؟" else "Delete ${target.person}?",
+                    style = MaterialTheme.typography.titleLarge
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "This will permanently delete ${target.person} and all their payment entries from Loan Khata.",
+                    text = if (isUrdu) {
+                        "اس سے ${target.person} اور ان کی تمام قسطوں کا ریکارڈ مستقل طور پر حذف ہو جائے گا۔"
+                    } else {
+                        "This will permanently delete ${target.person} and all their payment entries from Loan Ledger."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
@@ -618,7 +678,7 @@ fun LoanScreen(
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Cancel", color = TextPrimary)
+                        Text(if (isUrdu) "منسوخ" else "Cancel", color = TextPrimary)
                     }
                     Button(
                         onClick = {
@@ -628,11 +688,11 @@ fun LoanScreen(
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CashOutRed,
-                            contentColor = TextPrimary
+                            contentColor = OnEmeraldPrimary
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Delete", fontWeight = FontWeight.Bold)
+                        Text(if (isUrdu) "حذف کریں" else "Delete", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -646,17 +706,22 @@ private fun LoanPersonDetailScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     var entryAmount by remember { mutableStateOf("") }
     var entryNote by remember { mutableStateOf("") }
     var entryDate by remember { mutableStateOf(viewModel.todayFormatted()) }
-    var entryModeIndex by remember { mutableIntStateOf(0) } // 0 = Payment Received/Returned, 1 = Add More Loan
+    var entryModeIndex by remember { mutableIntStateOf(0) }
 
     val accent = if (loan.isToReceive) CashInGreen else CashOutRed
-    val settledTitle = if (loan.isToReceive) "Total Received" else "Total Returned"
-    val modeOptions = if (loan.isToReceive) {
-        listOf("Wapas Mila (Received)", "Mazeed Diya (+Loan)")
+    val settledTitle = if (loan.isToReceive) {
+        if (isUrdu) "کل وصول شدہ" else "Total Received"
     } else {
-        listOf("Wapas Diya (Paid)", "Mazeed Liya (+Loan)")
+        if (isUrdu) "کل ادا شدہ" else "Total Returned"
+    }
+    val modeOptions = if (loan.isToReceive) {
+        if (isUrdu) listOf("رقم وصول ہوئی", "مزید قرض دیا (+)") else listOf("Payment Received", "Add More Loan (+)")
+    } else {
+        if (isUrdu) listOf("رقم واپس کی", "مزید قرض لیا (+)") else listOf("Payment Returned", "Add More Loan (+)")
     }
 
     Column(
@@ -664,14 +729,16 @@ private fun LoanPersonDetailScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "${loan.person} • Khata", onBack = onBack)
+        HisabooSubTopBar(
+            title = if (isUrdu) "${loan.person} • کھاتہ" else "${loan.person} • Ledger",
+            onBack = onBack
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Top Person Summary Card
             item {
                 GlassCard(cornerRadius = 24.dp) {
                     Row(
@@ -681,14 +748,22 @@ private fun LoanPersonDetailScreen(
                     ) {
                         Column {
                             Text(
-                                text = if (loan.isToReceive) "LENA HAI (TO RECEIVE)" else "DENA HAI (TO RETURN)",
+                                text = if (loan.isToReceive) {
+                                    if (isUrdu) "وصول کرنے ہیں" else "TO RECEIVE"
+                                } else {
+                                    if (isUrdu) "واپس کرنے ہیں" else "TO RETURN"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = accent
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Remaining: ${formatRs(loan.remainingAmount)}",
+                                text = if (isUrdu) {
+                                    "باقی: ${formatRs(loan.remainingAmount)}"
+                                } else {
+                                    "Remaining: ${formatRs(loan.remainingAmount)}"
+                                },
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = if (loan.remainingAmount == 0.0) CashInGreen else accent,
@@ -704,7 +779,7 @@ private fun LoanPersonDetailScreen(
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = "CLEAR",
+                                    text = if (isUrdu) "مکمل" else "SETTLED",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CashInGreen
@@ -725,7 +800,11 @@ private fun LoanPersonDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Total Loan", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(
+                                text = if (isUrdu) "کل قرض" else "Total Loan",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
                             Text(
                                 text = formatRs(loan.totalLoanAmount),
                                 style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
@@ -734,7 +813,11 @@ private fun LoanPersonDetailScreen(
                             )
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(settledTitle, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                            Text(
+                                text = settledTitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
                             Text(
                                 text = formatRs(loan.settledAmount),
                                 style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
@@ -746,11 +829,10 @@ private fun LoanPersonDetailScreen(
                 }
             }
 
-            // Add Installment / Payment Entry Form
             item {
                 GlassCard(cornerRadius = 22.dp) {
                     Text(
-                        text = "New Entry for ${loan.person}",
+                        text = if (isUrdu) "${loan.person} کے لیے نیا اندراج" else "New Entry for ${loan.person}",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary
                     )
@@ -766,20 +848,20 @@ private fun LoanPersonDetailScreen(
                     HisabooTextField(
                         value = entryAmount,
                         onValueChange = { entryAmount = it },
-                        label = "Amount (Rs)",
+                        label = if (isUrdu) "رقم (روپے)" else "Amount (Rs)",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = entryNote,
                         onValueChange = { entryNote = it },
-                        label = "Note (e.g. 1st installment, Cash, EasyPaisa)"
+                        label = if (isUrdu) "تفصیل (مثلاً پہلی قسط، نقد)" else "Note (e.g. 1st installment, Cash)"
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = entryDate,
                         onValueChange = { entryDate = it },
-                        label = "Date (DD/MM/YYYY)"
+                        label = if (isUrdu) "تاریخ (DD/MM/YYYY)" else "Date (DD/MM/YYYY)"
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
@@ -804,12 +886,11 @@ private fun LoanPersonDetailScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Save Entry", fontWeight = FontWeight.Bold)
+                        Text(if (isUrdu) "اندراج محفوظ کریں" else "Save Entry", fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            // History Header
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -817,12 +898,12 @@ private fun LoanPersonDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Payment History",
+                        text = if (isUrdu) "ادائیگیوں کی تاریخ" else "Payment History",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary
                     )
                     Text(
-                        text = "${loan.payments.size} entries",
+                        text = if (isUrdu) "${loan.payments.size} اندراجات" else "${loan.payments.size} entries",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondary
                     )
@@ -836,7 +917,11 @@ private fun LoanPersonDetailScreen(
                         contentPadding = PaddingValues(24.dp)
                     ) {
                         Text(
-                            text = "No installments recorded yet. Initial amount: ${formatRs(loan.amount)}",
+                            text = if (isUrdu) {
+                                "ابھی تک کوئی قسط درج نہیں ہوئی۔ ابتدائی رقم: ${formatRs(loan.amount)}"
+                            } else {
+                                "No installments recorded yet. Initial amount: ${formatRs(loan.amount)}"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
                             textAlign = TextAlign.Center,
@@ -865,7 +950,11 @@ private fun LoanPersonDetailScreen(
                                     color = TextPrimary
                                 )
                                 Text(
-                                    text = "${pay.date} • ${if (pay.isAdditionalLoan) "Added to Loan" else "Installment"}",
+                                    text = if (isUrdu) {
+                                        "${pay.date} • ${if (pay.isAdditionalLoan) "مزید قرض" else "قسط"}"
+                                    } else {
+                                        "${pay.date} • ${if (pay.isAdditionalLoan) "Added to Loan" else "Installment"}"
+                                    },
                                     style = MaterialTheme.typography.labelMedium,
                                     color = TextSecondary
                                 )
@@ -906,6 +995,7 @@ fun UtilityBillsScreen(
     viewModel: HisabooViewModel,
     onBack: () -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     val providers = listOf("LESCO", "KE", "MEPCO", "SNGPL", "SSGC", "PTCL")
     var providerIndex by remember { mutableIntStateOf(0) }
     var title by remember { mutableStateOf("") }
@@ -917,7 +1007,10 @@ fun UtilityBillsScreen(
             .fillMaxSize()
             .background(BgObsidian)
     ) {
-        HisabooSubTopBar(title = "Utility Bills", onBack = onBack)
+        HisabooSubTopBar(
+            title = if (isUrdu) "یوٹیلیٹی بلز" else "Utility Bills",
+            onBack = onBack
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -929,7 +1022,7 @@ fun UtilityBillsScreen(
                     HisabooTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = "Title"
+                        label = if (isUrdu) "عنوان" else "Title"
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -945,7 +1038,7 @@ fun UtilityBillsScreen(
                     ) {
                         Icon(Icons.Rounded.Bolt, contentDescription = null, tint = AmberAccent, modifier = Modifier.size(18.dp))
                         Text(
-                            text = "Provider: ${providers[providerIndex]}",
+                            text = if (isUrdu) "ادارہ: ${providers[providerIndex]}" else "Provider: ${providers[providerIndex]}",
                             style = MaterialTheme.typography.labelLarge,
                             color = TextPrimary
                         )
@@ -955,14 +1048,14 @@ fun UtilityBillsScreen(
                     HisabooTextField(
                         value = amount,
                         onValueChange = { amount = it },
-                        label = "Amount",
+                        label = if (isUrdu) "رقم" else "Amount",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     HisabooTextField(
                         value = dueDate,
                         onValueChange = { dueDate = it },
-                        label = "Due date DD/MM/YYYY"
+                        label = if (isUrdu) "آخری تاریخ DD/MM/YYYY" else "Due date DD/MM/YYYY"
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
@@ -982,7 +1075,7 @@ fun UtilityBillsScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                     ) {
-                        Text("Add", fontWeight = FontWeight.Bold)
+                        Text(if (isUrdu) "شامل کریں" else "Add", fontWeight = FontWeight.Bold)
                     }
                 }
             }
