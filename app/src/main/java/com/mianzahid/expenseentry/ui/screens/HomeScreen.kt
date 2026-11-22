@@ -44,6 +44,7 @@ fun HomeScreen(
     onNavigate: (String) -> Unit
 ) {
     var showHubSheet by remember { mutableStateOf(false) }
+    val isUrdu = viewModel.appLanguage == "اردو"
     val todayHeaderDate = remember {
         SimpleDateFormat("EEEE, dd MMM yyyy", Locale.US).format(Date())
     }
@@ -57,11 +58,16 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            HomeTopBar(dateSubtitle = todayHeaderDate, onOpenHub = { showHubSheet = true })
+            HomeTopBar(
+                isUrdu = isUrdu,
+                dateSubtitle = todayHeaderDate,
+                onOpenHub = { showHubSheet = true }
+            )
         }
 
         item {
             HeroWalletCard(
+                isUrdu = isUrdu,
                 balance = viewModel.balanceInHand,
                 cashIn = viewModel.totalCashIn,
                 cashOut = viewModel.totalCashOut
@@ -70,6 +76,7 @@ fun HomeScreen(
 
         item {
             QuickActionRow(
+                isUrdu = isUrdu,
                 onCashIn = onQuickCashIn,
                 onCashOut = onQuickCashOut,
                 onBudget = { onNavigate(HisabooRoutes.BUDGET) },
@@ -79,6 +86,7 @@ fun HomeScreen(
 
         item {
             DailyHadithCard(
+                isUrduApp = isUrdu,
                 hadith = viewModel.dailyHadith,
                 selectedLang = viewModel.selectedHadithLang,
                 onSelectLang = { viewModel.selectedHadithLang = it }
@@ -92,12 +100,12 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Recent Transactions",
+                    text = if (isUrdu) "حالیہ لین دین" else "Recent Transactions",
                     style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary
                 )
                 Text(
-                    text = "${viewModel.transactions.size} entries",
+                    text = if (isUrdu) "${viewModel.transactions.size} اندراجات" else "${viewModel.transactions.size} entries",
                     style = MaterialTheme.typography.labelMedium,
                     color = TextSecondary
                 )
@@ -123,12 +131,16 @@ fun HomeScreen(
                             isCircle = true
                         )
                         Text(
-                            text = "No transactions recorded yet",
+                            text = if (isUrdu) "ابھی تک کوئی لین دین درج نہیں ہوا" else "No transactions recorded yet",
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimary
                         )
                         Text(
-                            text = "Tap + Cash In or - Cash Out above — entries auto-save offline & sync to Gmail when connected",
+                            text = if (isUrdu) {
+                                "اوپر + آمدن یا - خرچ پر ٹیپ کریں — اندراجات خودکار محفوظ ہوتے ہیں"
+                            } else {
+                                "Tap + Cash In or - Cash Out above — entries auto-save offline & sync to Gmail when connected"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
                             textAlign = TextAlign.Center
@@ -176,7 +188,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeTopBar(dateSubtitle: String, onOpenHub: () -> Unit) {
+private fun HomeTopBar(isUrdu: Boolean, dateSubtitle: String, onOpenHub: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,7 +216,7 @@ private fun HomeTopBar(dateSubtitle: String, onOpenHub: () -> Unit) {
 
             Column {
                 Text(
-                    text = "Hisaboo",
+                    text = if (isUrdu) "حسابو" else "Hisaboo",
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
@@ -236,7 +248,7 @@ private fun HomeTopBar(dateSubtitle: String, onOpenHub: () -> Unit) {
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "Admin",
+                    text = if (isUrdu) "ایڈمن" else "Admin",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary
@@ -265,6 +277,7 @@ private fun HomeTopBar(dateSubtitle: String, onOpenHub: () -> Unit) {
 
 @Composable
 private fun HeroWalletCard(
+    isUrdu: Boolean,
     balance: Double,
     cashIn: Double,
     cashOut: Double
@@ -279,7 +292,7 @@ private fun HeroWalletCard(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "BALANCE • IN HAND",
+            text = if (isUrdu) "موجودہ بیلنس" else "BALANCE • IN HAND",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.1.sp,
@@ -295,7 +308,7 @@ private fun HeroWalletCard(
                 style = MaterialTheme.typography.displayLarge
             )
             Text(
-                text = "Available amount with you",
+                text = if (isUrdu) "آپ کے پاس دستیاب رقم" else "Available amount with you",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFFA7F3D0)
             )
@@ -318,14 +331,14 @@ private fun HeroWalletCard(
                 Icon(
                     imageVector = Icons.Rounded.ArrowDownward,
                     contentDescription = "Cash In",
-                    tint = CashInGreen,
+                    tint = Color(0xFF6EE7B7),
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "IN: ${formatRs(cashIn)}",
+                    text = if (isUrdu) "آمدن: ${formatRs(cashIn)}" else "IN: ${formatRs(cashIn)}",
                     style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                     fontWeight = FontWeight.Bold,
-                    color = CashInGreen,
+                    color = Color(0xFF6EE7B7),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -344,14 +357,14 @@ private fun HeroWalletCard(
                 Icon(
                     imageVector = Icons.Rounded.ArrowUpward,
                     contentDescription = "Cash Out",
-                    tint = CashOutRed,
+                    tint = Color(0xFFFCA5A5),
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "OUT: ${formatRs(cashOut)}",
+                    text = if (isUrdu) "خرچ: ${formatRs(cashOut)}" else "OUT: ${formatRs(cashOut)}",
                     style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                     fontWeight = FontWeight.Bold,
-                    color = CashOutRed,
+                    color = Color(0xFFFCA5A5),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -362,6 +375,7 @@ private fun HeroWalletCard(
 
 @Composable
 private fun QuickActionRow(
+    isUrdu: Boolean,
     onCashIn: () -> Unit,
     onCashOut: () -> Unit,
     onBudget: () -> Unit,
@@ -372,25 +386,25 @@ private fun QuickActionRow(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         QuickActionButton(
-            label = "+ Cash In",
+            label = if (isUrdu) "+ آمدن" else "+ Cash In",
             icon = Icons.Rounded.Add,
             tint = CashInGreen,
             onClick = onCashIn
         )
         QuickActionButton(
-            label = "- Cash Out",
+            label = if (isUrdu) "- خرچ" else "- Cash Out",
             icon = Icons.Rounded.Remove,
             tint = CashOutRed,
             onClick = onCashOut
         )
         QuickActionButton(
-            label = "Budget",
+            label = if (isUrdu) "بجٹ" else "Budget",
             icon = Icons.Rounded.PieChart,
             tint = AmberAccent,
             onClick = onBudget
         )
         QuickActionButton(
-            label = "Report",
+            label = if (isUrdu) "رپورٹ" else "Report",
             icon = Icons.Rounded.BarChart,
             tint = EmeraldPrimary,
             onClick = onReport
@@ -436,6 +450,7 @@ private fun QuickActionButton(
 
 @Composable
 private fun DailyHadithCard(
+    isUrduApp: Boolean,
     hadith: DailyHadith,
     selectedLang: HadithLanguage,
     onSelectLang: (HadithLanguage) -> Unit
@@ -458,7 +473,7 @@ private fun DailyHadithCard(
                     isCircle = true
                 )
                 Text(
-                    text = "Daily Hadith",
+                    text = if (isUrduApp) "حدیثِ نبوی ﷺ" else "Daily Hadith",
                     style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary
                 )
@@ -602,15 +617,16 @@ private fun HisabooHubSheetContent(
     onDismiss: () -> Unit,
     onNavigate: (String) -> Unit
 ) {
+    val isUrdu = viewModel.appLanguage == "اردو"
     val modules = listOf(
-        HubModuleItem("Monthly Report", Icons.Rounded.Assessment, EmeraldPrimary, HisabooRoutes.REPORT),
-        HubModuleItem("Search", Icons.Rounded.Search, BlueAccent, HisabooRoutes.SEARCH),
-        HubModuleItem("Planned Payments", Icons.Rounded.EventRepeat, AmberAccent, HisabooRoutes.PLANNED_PAYMENTS),
-        HubModuleItem("Reminders", Icons.Rounded.NotificationsActive, CashOutRed, HisabooRoutes.REMINDERS),
-        HubModuleItem("Budget", Icons.Rounded.PieChart, EmeraldPrimary, HisabooRoutes.BUDGET),
-        HubModuleItem("Utility Bills", Icons.Rounded.Bolt, AmberAccent, HisabooRoutes.UTILITY_BILLS),
-        HubModuleItem("Family", Icons.Rounded.Groups, BlueAccent, HisabooRoutes.FAMILY),
-        HubModuleItem("Backup / Export", Icons.Rounded.CloudUpload, EmeraldPrimary, HisabooRoutes.BACKUP)
+        HubModuleItem(if (isUrdu) "ماہانہ رپورٹ" else "Monthly Report", Icons.Rounded.Assessment, EmeraldPrimary, HisabooRoutes.REPORT),
+        HubModuleItem(if (isUrdu) "تلاش" else "Search", Icons.Rounded.Search, BlueAccent, HisabooRoutes.SEARCH),
+        HubModuleItem(if (isUrdu) "طے شدہ ادائیگیاں" else "Planned Payments", Icons.Rounded.EventRepeat, AmberAccent, HisabooRoutes.PLANNED_PAYMENTS),
+        HubModuleItem(if (isUrdu) "یاد دہانیاں" else "Reminders", Icons.Rounded.NotificationsActive, CashOutRed, HisabooRoutes.REMINDERS),
+        HubModuleItem(if (isUrdu) "بجٹ" else "Budget", Icons.Rounded.PieChart, EmeraldPrimary, HisabooRoutes.BUDGET),
+        HubModuleItem(if (isUrdu) "یوٹیلیٹی بلز" else "Utility Bills", Icons.Rounded.Bolt, AmberAccent, HisabooRoutes.UTILITY_BILLS),
+        HubModuleItem(if (isUrdu) "فیملی" else "Family", Icons.Rounded.Groups, BlueAccent, HisabooRoutes.FAMILY),
+        HubModuleItem(if (isUrdu) "بیک اپ / ایکسپورٹ" else "Backup / Export", Icons.Rounded.CloudUpload, EmeraldPrimary, HisabooRoutes.BACKUP)
     )
 
     Column(
@@ -618,10 +634,10 @@ private fun HisabooHubSheetContent(
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Hisaboo Hub",
+            text = if (isUrdu) "حسابو ہب" else "Hisaboo Hub",
             style = MaterialTheme.typography.titleLarge,
             color = TextPrimary
         )
@@ -674,6 +690,7 @@ private fun HisabooHubSheetContent(
             containerColor = SurfaceGlass,
             contentPadding = PaddingValues(14.dp)
         ) {
+            // 1. Fingerprint Lock Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -691,7 +708,7 @@ private fun HisabooHubSheetContent(
                         isCircle = true
                     )
                     Text(
-                        text = "Fingerprint Lock",
+                        text = if (isUrdu) "فنگر پرنٹ لاک" else "Fingerprint Lock",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary
                     )
@@ -709,8 +726,86 @@ private fun HisabooHubSheetContent(
                 )
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 2. Light / Dark Theme Switcher (Default: Light)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TintedIconBadge(
+                        icon = if (viewModel.isDarkMode) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                        tint = AmberAccent,
+                        size = 36.dp,
+                        iconSize = 20.dp,
+                        isCircle = true
+                    )
+                    Column {
+                        Text(
+                            text = if (isUrdu) "تھیم موڈ" else "App Theme",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (viewModel.isDarkMode) {
+                                if (isUrdu) "ڈارک موڈ فعال ہے" else "Dark Mode"
+                            } else {
+                                if (isUrdu) "لائٹ موڈ فعال ہے" else "Light Mode"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(SurfaceCard)
+                        .border(1.dp, BorderGlass, CircleShape)
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val lightSelected = !viewModel.isDarkMode
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (lightSelected) EmeraldPrimary else Color.Transparent)
+                            .clickable { if (viewModel.isDarkMode) viewModel.toggleThemeMode() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isUrdu) "لائٹ" else "Light",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (lightSelected) OnEmeraldPrimary else TextSecondary
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(if (!lightSelected) EmeraldPrimary else Color.Transparent)
+                            .clickable { if (!viewModel.isDarkMode) viewModel.toggleThemeMode() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isUrdu) "ڈارک" else "Dark",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (!lightSelected) OnEmeraldPrimary else TextSecondary
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 3. Change PIN + Language (English / اردو) + Instant Lock
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -735,7 +830,7 @@ private fun HisabooHubSheetContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Change PIN",
+                        text = if (isUrdu) "پن تبدیل کریں" else "Change PIN",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
@@ -761,7 +856,7 @@ private fun HisabooHubSheetContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Language: ${viewModel.appLanguage}",
+                        text = if (isUrdu) "زبان: اردو" else "Language: English",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary,
