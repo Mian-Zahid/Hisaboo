@@ -29,6 +29,7 @@ class HisabooStorage(private val context: Context) {
         inviteCode: String?,
         fingerprintEnabled: Boolean,
         appLanguage: String,
+        isDarkMode: Boolean,
         currentPin: String,
         lastBackupText: String,
         usdToPkrRate: Double,
@@ -41,6 +42,7 @@ class HisabooStorage(private val context: Context) {
             inviteCode, fingerprintEnabled, appLanguage,
             currentPin, lastBackupText, usdToPkrRate
         )
+        root.put("isDarkMode", isDarkMode)
         root.put("connectedEmail", connectedEmail ?: "")
         root.put("autoCloudSyncEnabled", autoCloudSyncEnabled)
         prefs.edit().putString("ledger_state_json", root.toString()).apply()
