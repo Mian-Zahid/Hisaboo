@@ -9,7 +9,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,14 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
-import com.mianzahid.expenseentry.model.TransactionType
-import com.mianzahid.expenseentry.model.formatRs
-import com.mianzahid.expenseentry.model.getCategoryVisuals
 import com.mianzahid.expenseentry.ui.components.*
 import com.mianzahid.expenseentry.ui.theme.*
 import com.mianzahid.expenseentry.viewmodel.HisabooViewModel
@@ -44,246 +39,6 @@ private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (th
     is FragmentActivity -> this
     is ContextWrapper -> baseContext.findFragmentActivity()
     else -> null
-}
-
-@Composable
-fun MonthlyReportScreen(
-    viewModel: HisabooViewModel,
-    onBack: () -> Unit
-) {
-    val income = viewModel.totalCashIn
-    val expense = viewModel.totalCashOut
-    val net = viewModel.balanceInHand
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgObsidian)
-    ) {
-        HisabooSubTopBar(title = "Monthly Report", onBack = onBack)
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                GlassCard(cornerRadius = 22.dp) {
-                    Text(
-                        text = "OVERVIEW",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldPrimary
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    ReportStatRow("Income", formatRs(income), CashInGreen)
-                    HorizontalDivider(color = BorderGlass, modifier = Modifier.padding(vertical = 10.dp))
-                    ReportStatRow("Expense", formatRs(expense), CashOutRed)
-                    HorizontalDivider(color = BorderGlass, modifier = Modifier.padding(vertical = 10.dp))
-                    ReportStatRow("Net", formatRs(net), if (net >= 0) CashInGreen else CashOutRed)
-                }
-            }
-
-            item {
-                GlassCard(cornerRadius = 22.dp) {
-                    Text(
-                        text = "CATEGORY BREAKDOWN",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val breakdown = viewModel.categories.mapNotNull { cat ->
-                        val sum = viewModel.transactions
-                            .filter { it.categoryId == cat.id }
-                            .sumOf { it.amount }
-                        if (sum > 0) Triple(cat, sum, cat.type == TransactionType.CASH_IN) else null
-                    }
-
-                    if (breakdown.isEmpty()) {
-                        Text(
-                            text = "No transactions recorded yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-                    } else {
-                        breakdown.forEachIndexed { index, (cat, sum, isIncome) ->
-                            val (icon, tint) = getCategoryVisuals(cat.name, cat.type)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    TintedIconBadge(icon = icon, tint = tint, size = 34.dp, iconSize = 17.dp)
-                                    Text(cat.name, style = MaterialTheme.typography.bodyLarge)
-                                }
-                                Text(
-                                    text = formatRs(sum),
-                                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-                                    color = if (isIncome) CashInGreen else CashOutRed
-                                )
-                            }
-                            if (index < breakdown.lastIndex) {
-                                HorizontalDivider(color = BorderGlass.copy(alpha = 0.5f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportStatRow(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-            fontWeight = FontWeight.Bold,
-            color = valueColor
-        )
-    }
-}
-
-@Composable
-fun BudgetScreen(
-    viewModel: HisabooViewModel,
-    onBack: () -> Unit
-) {
-    val expenseCategories = viewModel.categories.filter { it.type == TransactionType.CASH_OUT }
-    var budgetCategoryId by remember { mutableStateOf<String?>(null) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgObsidian)
-    ) {
-        HisabooSubTopBar(title = "Budget", onBack = onBack)
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(expenseCategories, key = { it.id }) { category ->
-                val spent = viewModel.transactions
-                    .filter { it.categoryId == category.id }
-                    .sumOf { it.amount }
-                val limit = viewModel.categoryBudgets[category.id]
-                val (icon, tint) = getCategoryVisuals(category.name, category.type)
-
-                GlassCard(cornerRadius = 20.dp) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            TintedIconBadge(icon = icon, tint = tint, size = 40.dp)
-                            Column {
-                                Text(category.name, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    text = if (limit != null) {
-                                        "${formatRs(spent)} of ${formatRs(limit)} spent"
-                                    } else {
-                                        "No budget set • Spent ${formatRs(spent)}"
-                                    },
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { budgetCategoryId = category.id },
-                            shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = EmeraldPrimary,
-                                contentColor = OnEmeraldPrimary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                            modifier = Modifier.height(36.dp)
-                        ) {
-                            Text("Set", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
-
-                    if (limit != null && limit > 0) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        val progress = (spent / limit).toFloat().coerceIn(0f, 1f)
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            color = if (spent > limit) CashOutRed else EmeraldPrimary,
-                            trackColor = SurfaceGlass,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(CircleShape)
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    budgetCategoryId?.let { catId ->
-        val cat = expenseCategories.find { it.id == catId }
-        var inputLimit by remember {
-            mutableStateOf(viewModel.categoryBudgets[catId]?.toInt()?.toString() ?: "")
-        }
-
-        Dialog(onDismissRequest = { budgetCategoryId = null }) {
-            GlassCard(cornerRadius = 24.dp) {
-                Text("Set ${cat?.name ?: ""} Budget", style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(14.dp))
-                HisabooTextField(
-                    value = inputLimit,
-                    onValueChange = { inputLimit = it },
-                    label = "Monthly limit (Rs)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { budgetCategoryId = null }) {
-                        Text("Cancel", color = TextSecondary)
-                    }
-                    Button(
-                        onClick = {
-                            viewModel.setBudgetForCategory(catId, inputLimit.toDoubleOrNull() ?: 0.0)
-                            budgetCategoryId = null
-                        },
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EmeraldPrimary,
-                            contentColor = OnEmeraldPrimary
-                        )
-                    ) {
-                        Text("Save", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -472,7 +227,6 @@ fun BackupExportScreen(
                 }
             }
 
-            // 1. GMAIL / GOOGLE ACCOUNT AUTO-BACKUP & RESTORE CARD
             item {
                 GlassCard(cornerRadius = 22.dp) {
                     Row(
@@ -604,7 +358,6 @@ fun BackupExportScreen(
 
                     HorizontalDivider(color = BorderGlass, modifier = Modifier.padding(vertical = 12.dp))
 
-                    // Direct Send to Gmail Attachment (Works 100% even without OAuth setup)
                     OutlinedButton(
                         onClick = {
                             try {
@@ -632,7 +385,6 @@ fun BackupExportScreen(
                 }
             }
 
-            // 2. LOCAL & FILE BACKUP / RESTORE
             item {
                 GlassCard(cornerRadius = 22.dp) {
                     Text(
@@ -730,7 +482,6 @@ fun BackupExportScreen(
                 }
             }
 
-            // 3. EXCEL / CSV EXPORT
             item {
                 GlassCard(cornerRadius = 22.dp) {
                     Text(
