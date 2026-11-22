@@ -236,11 +236,22 @@ class HisabooStorage(private val context: Context) {
 
         val loanArr = JSONArray()
         loans.forEach { l ->
+            val paymentsArr = JSONArray()
+            l.payments.forEach { pay ->
+                paymentsArr.put(JSONObject().apply {
+                    put("id", pay.id)
+                    put("amount", pay.amount)
+                    put("note", pay.note)
+                    put("date", pay.date)
+                    put("isAdditionalLoan", pay.isAdditionalLoan)
+                })
+            }
             loanArr.put(JSONObject().apply {
                 put("id", l.id)
                 put("person", l.person)
                 put("amount", l.amount)
                 put("isToReceive", l.isToReceive)
+                put("payments", paymentsArr)
             })
         }
         root.put("loans", loanArr)
